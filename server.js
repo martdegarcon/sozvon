@@ -12,7 +12,7 @@ const TURN_HOST = process.env.TURN_HOST || '';          // напр. call.exampl
 const TURN_SECRET = process.env.TURN_SECRET || '';      // = static-auth-secret в coturn
 const TURN_TLS = process.env.TURN_TLS === '1';          // добавить turns:5349
 const STUN_URLS = process.env.STUN_URLS ?? 'stun:stun.l.google.com:19302,stun:stun.cloudflare.com:3478';
-const PUB = path.join(__dirname, 'public');
+const PUB = fs.existsSync(path.join(__dirname, 'public', 'index.html')) ? path.join(__dirname, 'public') : __dirname;
 
 const rooms = new Map();  // roomName -> { peers: Map(id -> peer), history: [] }
 const tokens = new Map(); // token -> peer
