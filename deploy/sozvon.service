@@ -1,0 +1,18 @@
+# Вариант без Docker: sudo cp deploy/sozvon.service /etc/systemd/system/ && sudo systemctl enable --now sozvon
+[Unit]
+Description=Sozvon video calls
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/sozvon
+ExecStart=/usr/bin/node server.js
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+Environment=TURN_HOST=call.example.ru
+Environment=TURN_SECRET=поменяйте-меня
+Environment=TURN_TLS=1
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

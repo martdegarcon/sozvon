@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Созвон</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%235b8cff'/><path d='M6 8h8v8H6zM15 11l4-2.5v7L15 13z' fill='white'/></svg>">
+<style>
+:root{--bg:#0e1015;--panel:#171a21;--panel2:#1f232c;--line:#2a2f3a;--text:#e8eaf0;--mute:#8b92a3;--acc:#5b8cff;--red:#ef4b4b;--green:#3ecf8e;--r:14px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+.hidden{display:none!important}
+svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* --- lobby --- */
+#lobby{min-height:100%;display:grid;place-items:center;padding:24px}
+.lobby-card{display:grid;grid-template-columns:minmax(0,560px) 320px;gap:28px;align-items:center;max-width:960px;width:100%}
+@media(max-width:820px){.lobby-card{grid-template-columns:1fr}}
+.form h1{margin:0 0 4px;font-size:28px}
+.form .sub{color:var(--mute);margin:0 0 18px}
+label.f{display:block;margin-bottom:12px;color:var(--mute);font-size:13px}
+label.f input{display:block;width:100%;margin-top:6px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);outline:none}
+label.f input:focus{border-color:var(--acc)}
+.row{display:flex;gap:10px;margin:14px 0}
+.primary{width:100%;padding:13px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-weight:600;cursor:pointer}
+.primary:hover{filter:brightness(1.1)}
+.hint{color:var(--mute);font-size:13px;min-height:1.4em}
+.hint.err{color:#ff8a8a}
+
+/* --- tiles --- */
+.tile{position:relative;background:#000;border-radius:var(--r);overflow:hidden;aspect-ratio:16/9;min-height:0;outline:3px solid transparent;transition:outline-color .15s}
+.tile video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+.tile.screen video{object-fit:contain}
+.tile.mirror video{transform:scaleX(-1)}
+.tile .avatar{position:absolute;inset:0;display:none;place-items:center;background:var(--panel2)}
+.tile .avatar b{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:34px;font-weight:600;color:#fff}
+.tile.novideo .avatar{display:grid}
+.tile.novideo video{visibility:hidden}
+.tile .label{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.55);padding:4px 9px;border-radius:8px;font-size:13px;max-width:calc(100% - 20px)}
+.tile .label .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .label .mo{display:none;color:var(--red)}
+.tile.micoff .label .mo{display:inline}
+.tile .label .mo svg{width:15px;height:15px}
+.tile .st{position:absolute;top:10px;left:10px;font-size:12px;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:6px;display:none}
+.tile .st:not(:empty){display:block}
+.tile .hand{position:absolute;top:8px;right:10px;font-size:24px;display:none}
+.tile.hand .hand{display:block}
+.tile.speaking{outline-color:var(--green)}
+.tile .fs{position:absolute;top:8px;right:8px;opacity:0;background:rgba(0,0,0,.55);border:0;border-radius:8px;padding:6px;cursor:pointer;transition:opacity .15s}
+.tile:hover .fs{opacity:1}
+.tile .fs svg{width:18px;height:18px}
+.tile:fullscreen video{object-fit:contain}
+.meter{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.08)}
+.meter i{display:block;height:100%;width:0;background:var(--green);transition:width .08s}
+
+/* --- call --- */
+#call{height:100%;display:flex;flex-direction:column}
+#call header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+#call header .t{font-weight:600}
+#call header .c{color:var(--mute);font-size:13px}
+#call header .sp{flex:1}
+.ghost{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px}
+.ghost:hover{border-color:var(--acc)}
+main{flex:1;display:flex;min-height:0}
+#grid{flex:1;display:flex;flex-wrap:wrap;gap:10px;padding:12px;justify-content:center;align-content:center;min-height:0;min-width:0;overflow:auto}
+#grid .tile{cursor:pointer;width:var(--tw,320px);flex:none}
+#grid.focus{display:grid;grid-template-columns:1fr 220px;grid-auto-rows:min-content;align-content:start}
+#grid.focus .tile{width:auto}
+#grid.focus .tile.pinned{grid-column:1;grid-row:1/span 50;aspect-ratio:auto;height:calc(100vh - 160px)}
+#grid.focus .tile:not(.pinned){grid-column:2}
+@media(max-width:700px){#grid.focus{grid-template-columns:1fr}#grid.focus .tile.pinned{grid-row:auto;height:50vh}#grid.focus .tile:not(.pinned){grid-column:1}}
+
+#chat{width:330px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel)}
+@media(max-width:700px){#chat{position:fixed;inset:0 0 72px 0;width:auto;z-index:5}}
+.chat-h{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font-weight:600}
+.chat-h button{background:none;border:0;font-size:22px;cursor:pointer;color:var(--mute)}
+#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:85%;align-self:flex-start}
+.msg.me{align-self:flex-end;text-align:right}
+.msg .who{font-size:12px;color:var(--mute);margin-bottom:2px}
+.msg .bub{display:inline-block;text-align:left;background:var(--panel2);padding:7px 11px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+.msg.me .bub{background:var(--acc);color:#fff}
+.msg .bub a{color:inherit}
+.sys{align-self:center;color:var(--mute);font-size:12px}
+#chatForm{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+#chatForm input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);outline:none}
+#chatForm button{border:0;background:var(--acc);color:#fff;border-radius:10px;padding:0 14px;cursor:pointer}
+
+footer{display:flex;justify-content:center;gap:10px;padding:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+.ctl{position:relative;width:52px;height:52px;border-radius:50%;border:0;background:var(--panel2);display:grid;place-items:center;cursor:pointer;transition:background .15s}
+.ctl:hover{background:#2b303b}
+.ctl.off{background:var(--red);color:#fff}
+.ctl.on{background:var(--acc);color:#fff}
+.ctl.leave{background:var(--red);color:#fff;width:68px;border-radius:26px}
+.ctl .badge{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px}
+.ctl[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:60px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#000;padding:4px 8px;border-radius:6px;font-size:12px;pointer-events:none}
+
+/* --- settings --- */
+dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);font-weight:600;font-size:17px}
+.dlg-h button{background:none;border:0;font-size:24px;cursor:pointer;color:var(--mute)}
+.dlg-b{padding:16px 20px;max-height:70vh;overflow:auto}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+.tabs button.act{border-color:var(--acc);color:var(--acc)}
+.fld{margin-bottom:14px}
+.fld>span{display:block;font-size:13px;color:var(--mute);margin-bottom:6px}
+.fld select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.fld .inl{display:flex;gap:8px;align-items:center}
+.fld .inl select{flex:1}
+.bar{height:8px;border-radius:4px;background:var(--bg);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .08s}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--acc)}
+.chk small{display:block;color:var(--mute)}
+.prevS{border-radius:10px;overflow:hidden;margin-bottom:14px;aspect-ratio:16/9;background:#000}
+.prevS video{width:100%;height:100%;object-fit:cover}
+#toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:50;pointer-events:none}
+#toast div{background:#000c;border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-size:14px;animation:fade 4s forwards}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%,85%{opacity:1;transform:none}100%{opacity:0}}
+</style>
+</head>
+<body>
+
+<!-- ЛОББИ -->
+<section id="lobby">
+  <div class="lobby-card">
+    <div class="tile mirror" id="pvTile">
+      <video id="pv" autoplay playsinline muted></video>
+      <div class="avatar"><b id="pvAv">?</b></div>
+      <div class="meter"><i id="pvMeter"></i></div>
+    </div>
+    <div class="form">
+      <h1>Созвон</h1>
+      <p class="sub">Видеозвонки, чат и демонстрация экрана</p>
+      <label class="f">Ваше имя<input id="name" maxlength="40" placeholder="Как вас зовут?"></label>
+      <label class="f">Комната<input id="room" maxlength="64" placeholder="название-комнаты"></label>
+      <div class="row">
+        <button class="ctl" id="lMic" data-tip="Микрофон"></button>
+        <button class="ctl" id="lCam" data-tip="Камера"></button>
+        <button class="ctl" id="lSet" data-tip="Настройки"></button>
+      </div>
+      <button class="primary" id="join">Войти в комнату</button>
+      <p class="hint" id="hint"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ЗВОНОК -->
+<section id="call" class="hidden">
+  <header>
+    <span class="t" id="roomTitle"></span>
+    <span class="c" id="count"></span>
+    <span class="sp"></span>
+    <button class="ghost" id="copy">Скопировать ссылку</button>
+  </header>
+  <main>
+    <div id="grid"></div>
+    <aside id="chat" class="hidden">
+      <div class="chat-h">Чат <button id="chatClose" aria-label="Закрыть">×</button></div>
+      <div id="msgs"></div>
+      <form id="chatForm"><input id="chatInput" placeholder="Сообщение…" autocomplete="off" maxlength="4000"><button aria-label="Отправить">➤</button></form>
+    </aside>
+  </main>
+  <footer>
+    <button class="ctl" id="bMic" data-tip="Микрофон (M)"></button>
+    <button class="ctl" id="bCam" data-tip="Камера (V)"></button>
+    <button class="ctl" id="bScreen" data-tip="Демонстрация экрана"></button>
+    <button class="ctl" id="bHand" data-tip="Поднять руку">✋</button>
+    <button class="ctl" id="bChat" data-tip="Чат"><span class="badge hidden" id="unread">0</span></button>
+    <button class="ctl" id="bSet" data-tip="Настройки"></button>
+    <button class="ctl leave" id="bLeave" data-tip="Выйти"></button>
+  </footer>
+</section>
+
+<!-- НАСТРОЙКИ -->
+<dialog id="dlg">
+  <div class="dlg-h">Настройки <button id="dlgClose" aria-label="Закрыть">×</button></div>
+  <div class="dlg-b">
+    <div class="tabs"><button data-tab="dev" class="act">Устройства</button><button data-tab="audio">Звук</button><button data-tab="video">Видео</button></div>
+    <div data-pane="dev">
+      <div class="prevS"><video id="sPrev" autoplay playsinline muted></video></div>
+      <label class="fld"><span>Камера</span><select id="sCam"></select></label>
+      <label class="fld"><span>Микрофон</span><select id="sMic"></select><div class="bar"><i id="sMeter"></i></div></label>
+      <div class="fld" id="spkFld"><span>Динамики / наушники</span>
+        <div class="inl"><select id="sSpk"></select><button class="ghost" id="testSnd" type="button">Проверить</button></div></div>
+    </div>
+    <div data-pane="audio" class="hidden">
+      <label class="chk"><input type="checkbox" id="sEc"><div>Эхоподавление<small>Убирает эхо, если звук идёт из колонок</small></div></label>
+      <label class="chk"><input type="checkbox" id="sNs"><div>Шумоподавление<small>Глушит фоновый шум: вентилятор, клавиатуру</small></div></label>
+      <label class="chk"><input type="checkbox" id="sAgc"><div>Автоусиление громкости<small>Выравнивает громкость голоса</small></div></label>
+      <label class="chk"><input type="checkbox" id="sJoinMuted"><div>Входить с выключенным микрофоном</div></label>
+    </div>
+    <div data-pane="video" class="hidden">
+      <label class="fld"><span>Качество камеры</span><select id="sRes"><option value="360">360p (экономия трафика)</option><option value="720">720p HD</option><option value="1080">1080p Full HD</option></select></label>
+      <label class="fld"><span>Частота кадров</span><select id="sFps"><option>15</option><option>24</option><option>30</option></select></label>
+      <label class="fld"><span>Демонстрация экрана</span><select id="sScr"><option value="detail">Чёткость (текст, код, слайды)</option><option value="motion">Плавность (видео, игры)</option></select></label>
+      <label class="chk"><input type="checkbox" id="sMirror"><div>Зеркалить своё видео<small>Только у вас, собеседники видят как обычно</small></div></label>
+      <label class="chk"><input type="checkbox" id="sJoinNoCam"><div>Входить с выключенной камерой</div></label>
+    </div>
+  </div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const IC = {
+  mic:'<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>',
+  micOff:'<svg viewBox="0 0 24 24"><path d="M3 3l18 18M9 9v1a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7M5 10a7 7 0 0 0 11.2 5.6M19 10a7 7 0 0 1-.6 2.8M12 17v5"/></svg>',
+  cam:'<svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
+  camOff:'<svg viewBox="0 0 24 24"><path d="M3 3l18 18M16 10l6-3v10l-4-2M14 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2M10 6h4a2 2 0 0 1 2 2v4"/></svg>',
+  screen:'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M9 10l3-3 3 3M12 7v6"/></svg>',
+  chat:'<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-6.2A8 8 0 1 1 21 12z"/></svg>',
+  gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  leave:'<svg viewBox="0 0 24 24"><path d="M3 15c5-4.5 13-4.5 18 0l-2.5 2.5-3-1.5v-2.5a12 12 0 0 0-7 0V16l-3 1.5z" fill="currentColor"/></svg>',
+  full:'<svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>',
+};
+
+// ---------- настройки ----------
+const S = Object.assign({cam:'',mic:'',spk:'',res:'720',fps:'30',scr:'detail',ec:true,ns:true,agc:true,mirror:true,joinMuted:false,joinNoCam:false,name:''},
+  JSON.parse(localStorage.getItem('sozvon') || '{}'));
+const save = () => localStorage.setItem('sozvon', JSON.stringify(S));
+
+// ---------- состояние ----------
+const local = { audio:null, video:null };
+let micOn = !S.joinMuted, camOn = !S.joinNoCam, hand = false;
+let screen = null, mix = null;
+let me = null, token = null, roomName = '', es = null, iceServers = [], inCall = false, leaving = false;
+const peers = new Map();
+let selfTile = null, pinned = null, unread = 0, actx = null;
+
+const toast = t => { const d = document.createElement('div'); d.textContent = t; $('#toast').append(d); setTimeout(() => d.remove(), 4000); };
+const ac = () => (actx ||= new (window.AudioContext || window.webkitAudioContext)());
+const hue = s => [...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+
+// ---------- медиа ----------
+const RES = { '360':[640,360], '720':[1280,720], '1080':[1920,1080] };
+const aC = () => ({ deviceId: S.mic ? { exact:S.mic } : undefined, echoCancellation:S.ec, noiseSuppression:S.ns, autoGainControl:S.agc });
+const vC = () => { const [w,h] = RES[S.res]; return { deviceId: S.cam ? { exact:S.cam } : undefined, width:{ideal:w}, height:{ideal:h}, frameRate:{ideal:+S.fps} }; };
+const gUM = c => navigator.mediaDevices.getUserMedia(c);
+
+async function acquire(kind) {
+  try { return (await gUM({ [kind]: kind === 'audio' ? aC() : vC() })).getTracks()[0]; }
+  catch (e) {
+    if (e.name === 'OverconstrainedError' || e.name === 'NotFoundError' || e.name === 'NotReadableError') {
+      if (kind === 'audio') S.mic = ''; else S.cam = '';
+      try { return (await gUM({ [kind]: kind === 'audio' ? aC() : vC() })).getTracks()[0]; } catch (e2) { e = e2; }
+    }
+    mediaError(kind, e); return null;
+  }
+}
+function mediaError(kind, e) {
+  const what = kind === 'audio' ? 'микрофону' : 'камере';
+  const msg = e.name === 'NotAllowedError' ? `Нет доступа к ${what} — разрешите его в адресной строке браузера`
+    : e.name === 'NotFoundError' ? `Не найдено устройство: ${kind === 'audio' ? 'микрофон' : 'камера'}`
+    : e.name === 'NotReadableError' ? `${kind === 'audio' ? 'Микрофон' : 'Камера'} занят(а) другой программой`
+    : `Ошибка доступа к ${what}: ${e.name}`;
+  toast(msg); setHint(msg, true);
+}
+function setAudio(t) {
+  if (local.audio && local.audio !== t) local.audio.stop();
+  local.audio = t;
+  if (t) { t.enabled = micOn; t.onended = () => { toast('Микрофон отключился'); }; }
+  if (screen) buildMix();
+  setupSelfMeter(); refreshOutgoing();
+}
+function setVideo(t) {
+  if (local.video && local.video !== t) local.video.stop();
+  local.video = t;
+  if (t) t.onended = () => { if (local.video === t) { toast('Камера отключилась'); local.video = null; refreshOutgoing(); } };
+  refreshOutgoing();
+}
+async function initMedia() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setHint(location.protocol !== 'https:' && location.hostname !== 'localhost'
+      ? 'Камера и микрофон работают только по HTTPS. Откройте сайт через https://' : 'Браузер не поддерживает видеозвонки', true);
+    return;
+  }
+  try {
+    const s = await gUM({ audio: aC(), video: camOn ? vC() : false });
+    setAudio(s.getAudioTracks()[0] || null); setVideo(s.getVideoTracks()[0] || null);
+  } catch {
+    setAudio(await acquire('audio'));
+    if (camOn) setVideo(await acquire('video'));
+  }
+  await fillDevices();
+}
+async function reacquire(kind) {
+  if (kind === 'audio') { local.audio?.stop(); setAudio(await acquire('audio')); }
+  else { local.video?.stop(); local.video = null; if (camOn) setVideo(await acquire('video')); else refreshOutgoing(); }
+}
+
+async function fillDevices() {
+  const list = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind, cur, none) => {
+    const devs = list.filter(d => d.kind === kind);
+    sel.innerHTML = devs.length ? '' : `<option value="">${none}</option>`;
+    devs.forEach((d, i) => sel.add(new Option(d.label || `${none.replace('Нет ', '')} ${i + 1}`, d.deviceId)));
+    if (cur && devs.some(d => d.deviceId === cur)) sel.value = cur;
+  };
+  fill($('#sCam'), 'videoinput', local.video?.getSettings().deviceId || S.cam, 'Нет камеры');
+  fill($('#sMic'), 'audioinput', local.audio?.getSettings().deviceId || S.mic, 'Нет микрофона');
+  fill($('#sSpk'), 'audiooutput', S.spk, 'По умолчанию');
+}
+navigator.mediaDevices?.addEventListener?.('devicechange', fillDevices);
+
+// ---------- уровень звука / говорящий ----------
+const meters = new Map(); // key -> {an, buf, cb}
+function addMeter(key, track, cb) {
+  removeMeter(key); if (!track) return;
+  try {
+    const src = ac().createMediaStreamSource(new MediaStream([track]));
+    const an = ac().createAnalyser(); an.fftSize = 512; src.connect(an);
+    meters.set(key, { an, src, buf: new Uint8Array(an.fftSize), cb });
+  } catch {}
+}
+function removeMeter(key) { const m = meters.get(key); if (m) { try { m.src.disconnect(); } catch {} meters.delete(key); } }
+setInterval(() => {
+  for (const m of meters.values()) {
+    m.an.getByteTimeDomainData(m.buf);
+    let s = 0; for (const v of m.buf) { const x = (v - 128) / 128; s += x * x; }
+    m.cb(Math.min(1, Math.sqrt(s / m.buf.length) * 4));
+  }
+}, 90);
+function setupSelfMeter() {
+  addMeter('self', local.audio, lvl => {
+    const v = micOn ? lvl : 0;
+    $('#pvMeter').style.width = $('#sMeter').style.width = (v * 100) + '%';
+    selfTile?.el.classList.toggle('speaking', v > .12);
+  });
+}
+
+// ---------- исходящие треки ----------
+const outVideo = () => screen ? screen.getVideoTracks()[0] : local.video;
+const outAudio = () => mix ? mix.track : local.audio;
+function buildMix() {
+  mix?.nodes.forEach(n => { try { n.disconnect(); } catch {} }); mix = null;
+  const sa = screen?.getAudioTracks()[0]; if (!sa) return;
+  const dest = ac().createMediaStreamDestination(), nodes = [];
+  for (const t of [local.audio, sa]) if (t) { const n = ac().createMediaStreamSource(new MediaStream([t])); n.connect(dest); nodes.push(n); }
+  mix = { track: dest.stream.getAudioTracks()[0], nodes };
+}
+function attachLocal(p) {
+  for (const t of p.pc.getTransceivers()) {
+    if (t.stopped || t.currentDirection === 'stopped') continue;
+    const kind = t.receiver.track.kind;
+    if (t.direction !== 'sendrecv') t.direction = 'sendrecv';
+    t.sender.replaceTrack(kind === 'video' ? outVideo() || null : outAudio() || null).catch(() => {});
+  }
+}
+function refreshOutgoing() {
+  peers.forEach(attachLocal);
+  renderSelf(); renderButtons(); sendState();
+}
+function renderSelf() {
+  const vt = outVideo();
+  for (const [v, tile] of [[$('#pv'), $('#pvTile')], [$('#sPrev'), null], selfTile ? [selfTile.video, selfTile.el] : [null, null]]) {
+    if (!v) continue;
+    const cur = v.srcObject?.getVideoTracks()[0];
+    if (cur !== vt) v.srcObject = vt ? new MediaStream([vt]) : null;
+    if (tile) {
+      tile.classList.toggle('novideo', !vt);
+      tile.classList.toggle('mirror', !!vt && !screen && S.mirror);
+      tile.classList.toggle('screen', !!screen);
+      tile.classList.toggle('micoff', !micOn);
+    }
+  }
+  const nm = ($('#name').value.trim() || S.name || '?');
+  $('#pvAv').textContent = nm[0].toUpperCase(); $('#pvAv').style.background = `hsl(${hue(nm)} 55% 45%)`;
+  if (selfTile) selfTile.el.classList.toggle('hand', hand);
+}
+function renderButtons() {
+  for (const b of ['#lMic', '#bMic']) { $(b).innerHTML = micOn ? IC.mic : IC.micOff; $(b).classList.toggle('off', !micOn); }
+  for (const b of ['#lCam', '#bCam']) { $(b).innerHTML = camOn ? IC.cam : IC.camOff; $(b).classList.toggle('off', !camOn); }
+  $('#bScreen').classList.toggle('on', !!screen);
+  $('#bHand').classList.toggle('on', hand);
+}
+
+// ---------- кнопки ----------
+function toggleMic() { micOn = !micOn; if (local.audio) local.audio.enabled = micOn; refreshOutgoing(); }
+async function toggleCam() {
+  camOn = !camOn;
+  if (!camOn) { local.video?.stop(); local.video = null; refreshOutgoing(); }
+  else { renderButtons(); setVideo(await acquire('video')); if (!local.video) { camOn = false; renderButtons(); } }
+}
+async function toggleScreen() {
+  if (screen) return stopScreen();
+  if (!navigator.mediaDevices.getDisplayMedia) return toast('Ваш браузер не поддерживает демонстрацию экрана');
+  try {
+    const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: S.scr === 'motion' ? 30 : 15 } }, audio: true });
+    screen = s;
+    const vt = s.getVideoTracks()[0]; vt.contentHint = S.scr; vt.onended = stopScreen;
+    buildMix(); refreshOutgoing();
+    toast(s.getAudioTracks().length ? 'Демонстрация со звуком включена' : 'Демонстрация экрана включена');
+  } catch (e) { if (e.name !== 'NotAllowedError') toast('Не удалось начать демонстрацию: ' + e.name); }
+}
+function stopScreen() {
+  if (!screen) return;
+  screen.getTracks().forEach(t => t.stop()); screen = null; buildMix(); refreshOutgoing();
+}
+function toggleHand() { hand = !hand; refreshOutgoing(); }
+
+// ---------- плитки ----------
+function makeTile(id, name) {
+  const el = document.createElement('div');
+  el.className = 'tile novideo';
+  el.innerHTML = `<video autoplay playsinline></video><div class="avatar"><b></b></div><div class="st"></div><div class="hand">✋</div>
+    <div class="label"><span class="mo">${IC.micOff}</span><span class="nm"></span></div><button class="fs" title="На весь экран">${IC.full}</button>`;
+  const t = { el, video: el.querySelector('video') };
+  setTileName(t, name);
+  el.querySelector('.fs').onclick = e => { e.stopPropagation(); (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el); };
+  el.onclick = () => pin(pinned === el ? null : el);
+  el.ondblclick = () => (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  $('#grid').append(el); layout();
+  return t;
+}
+function setTileName(t, name) {
+  t.el.querySelector('.nm').textContent = name;
+  const b = t.el.querySelector('.avatar b'); b.textContent = (name[0] || '?').toUpperCase(); b.style.background = `hsl(${hue(name)} 55% 45%)`;
+}
+function pin(el) {
+  pinned?.classList.remove('pinned'); pinned = el; el?.classList.add('pinned');
+  $('#grid').classList.toggle('focus', !!el); layout();
+}
+function layout() {
+  const g = $('#grid'), n = g.children.length, GAP = 10;
+  const W = g.clientWidth - 24, H = g.clientHeight - 24;
+  let best = 160;
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const tw = Math.min((W - GAP * (cols - 1)) / cols, ((H - GAP * (rows - 1)) / rows) * 16 / 9);
+    if (tw > best) best = tw;
+  }
+  g.style.setProperty('--tw', Math.floor(best) + 'px');
+  $('#count').textContent = `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'участник' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'участника' : 'участников'}`;
+}
+addEventListener('resize', layout);
+function applySink(v) { if (S.spk && v.setSinkId) v.setSinkId(S.spk).catch(() => {}); }
+
+// ---------- WebRTC (perfect negotiation, mesh) ----------
+function createPeer(id, name, state, initiator) {
+  if (peers.has(id)) return peers.get(id);
+  const pc = new RTCPeerConnection({ iceServers });
+  const tile = makeTile(id, name);
+  const p = { id, name, pc, tile, state: state || {}, polite: me > id, makingOffer: false, ignoreOffer: false, stream: new MediaStream(), q: Promise.resolve() };
+  peers.set(id, p);
+  tile.video.srcObject = p.stream; applySink(tile.video);
+  tile.el.querySelector('.st').textContent = 'Подключение…';
+  applyState(p);
+
+  pc.ontrack = e => {
+    p.stream.getTracks().filter(t => t.kind === e.track.kind).forEach(t => p.stream.removeTrack(t));
+    p.stream.addTrack(e.track);
+    tile.video.srcObject = p.stream; tile.video.play().catch(() => {});
+    if (e.track.kind === 'audio') addMeter(id, e.track, l => tile.el.classList.toggle('speaking', l > .1 && p.state.mic !== false));
+    if (e.track.kind === 'video') { e.track.onmute = () => applyState(p); e.track.onunmute = () => applyState(p); }
+  };
+  pc.onicecandidate = e => { if (e.candidate) send('signal', { candidate: e.candidate }, id); };
+  pc.onnegotiationneeded = async () => {
+    try { p.makingOffer = true; await pc.setLocalDescription(); send('signal', { description: pc.localDescription }, id); }
+    catch (e) { console.warn(e); } finally { p.makingOffer = false; }
+  };
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    tile.el.querySelector('.st').textContent = s === 'connected' ? '' : s === 'failed' ? 'Нет связи — переподключаю…' : s === 'disconnected' ? 'Связь прервалась…' : 'Подключение…';
+    if (s === 'failed') pc.restartIce();
+  };
+  if (initiator) {
+    pc.addTransceiver('audio', { direction: 'sendrecv' });
+    pc.addTransceiver('video', { direction: 'sendrecv' });
+    attachLocal(p);
+  }
+  return p;
+}
+function onSignal({ from, data }) {
+  const p = peers.get(from) || createPeer(from, 'Гость', {}, false);
+  p.q = p.q.then(async () => {
+    const pc = p.pc;
+    try {
+      if (data.description) {
+        const d = data.description;
+        const collision = d.type === 'offer' && (p.makingOffer || pc.signalingState !== 'stable');
+        p.ignoreOffer = !p.polite && collision;
+        if (p.ignoreOffer) return;
+        await pc.setRemoteDescription(d);
+        if (d.type === 'offer') {
+          attachLocal(p);
+          await pc.setLocalDescription();
+          send('signal', { description: pc.localDescription }, from);
+        }
+      } else if (data.candidate) {
+        try { await pc.addIceCandidate(data.candidate); } catch (e) { if (!p.ignoreOffer) console.warn(e); }
+      }
+    } catch (e) { console.warn('signal error', e); }
+  });
+}
+function applyState(p) {
+  const s = p.state, vt = p.stream.getVideoTracks()[0];
+  p.tile.el.classList.toggle('micoff', s.mic === false);
+  p.tile.el.classList.toggle('novideo', !(s.cam || s.screen) || !vt || vt.muted);
+  p.tile.el.classList.toggle('screen', !!s.screen);
+  p.tile.el.classList.toggle('hand', !!s.hand);
+}
+function removePeer(id) {
+  const p = peers.get(id); if (!p) return;
+  p.pc.close(); removeMeter(id);
+  if (pinned === p.tile.el) pin(null);
+  p.tile.el.remove(); peers.delete(id); layout();
+}
+
+// ---------- сигнализация ----------
+async function send(type, data, to) {
+  if (!token) return;
+  try { await fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, type, data, to }) }); }
+  catch { }
+}
+function sendState() { if (inCall) send('state', { mic: micOn && !!local.audio, cam: camOn && !!local.video, screen: !!screen, hand }); }
+
+function connect() {
+  const name = S.name || 'Гость';
+  es = new EventSource(`/events?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(name)}`);
+  es.addEventListener('hello', e => {
+    const d = JSON.parse(e.data);
+    me = d.id; token = d.token; iceServers = d.iceServers;
+    $('#msgs').innerHTML = ''; d.history.forEach(m => addMsg(m, true));
+    d.peers.forEach(p => createPeer(p.id, p.name, p.state, true));
+    sendState();
+  });
+  es.addEventListener('join', e => { const d = JSON.parse(e.data); createPeer(d.id, d.name, d.state, false); sysMsg(`${d.name} подключился(-ась)`); });
+  es.addEventListener('leave', e => { const d = JSON.parse(e.data); const p = peers.get(d.id); if (p) sysMsg(`${p.name} вышел(-ла)`); removePeer(d.id); });
+  es.addEventListener('signal', e => onSignal(JSON.parse(e.data)));
+  es.addEventListener('chat', e => addMsg(JSON.parse(e.data)));
+  es.addEventListener('state', e => {
+    const d = JSON.parse(e.data), p = peers.get(d.id); if (!p) return;
+    if (d.state.hand && !p.state.hand) toast(`${p.name} поднимает руку ✋`);
+    if (d.state.screen && !p.state.screen) { toast(`${p.name} показывает экран`); pin(p.tile.el); }
+    if (!d.state.screen && p.state.screen && pinned === p.tile.el) pin(null);
+    p.state = d.state; applyState(p);
+  });
+  es.addEventListener('full', e => { leaving = true; es.close(); alert(`Комната заполнена (максимум ${JSON.parse(e.data).max})`); location.href = location.pathname; });
+  es.onerror = () => {
+    if (leaving) return;
+    es.close(); token = null;
+    [...peers.keys()].forEach(removePeer);
+    toast('Связь с сервером потеряна, переподключаюсь…');
+    setTimeout(() => inCall && connect(), 2500);
+  };
+}
+
+// ---------- чат ----------
+function linkify(el, text) {
+  const re = /(https?:\/\/[^\s<]+)/g; let last = 0, m;
+  while ((m = re.exec(text))) {
+    el.append(text.slice(last, m.index));
+    const a = document.createElement('a'); a.href = m[1]; a.textContent = m[1]; a.target = '_blank'; a.rel = 'noopener noreferrer'; el.append(a);
+    last = m.index + m[1].length;
+  }
+  el.append(text.slice(last));
+}
+function addMsg(m, silent) {
+  const mine = m.id === me;
+  const d = document.createElement('div'); d.className = 'msg' + (mine ? ' me' : '');
+  const who = document.createElement('div'); who.className = 'who';
+  who.textContent = `${mine ? 'Вы' : m.name} · ${new Date(m.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+  const b = document.createElement('div'); b.className = 'bub'; linkify(b, m.text);
+  d.append(who, b); $('#msgs').append(d); $('#msgs').scrollTop = 1e9;
+  if (!mine && !silent && $('#chat').classList.contains('hidden')) {
+    unread++; $('#unread').textContent = unread; $('#unread').classList.remove('hidden');
+    toast(`💬 ${m.name}: ${m.text.slice(0, 60)}`);
+  }
+}
+function sysMsg(t) { const d = document.createElement('div'); d.className = 'sys'; d.textContent = t; $('#msgs').append(d); $('#msgs').scrollTop = 1e9; }
+function toggleChat(force) {
+  const open = force ?? $('#chat').classList.contains('hidden');
+  $('#chat').classList.toggle('hidden', !open);
+  $('#bChat').classList.toggle('on', open);
+  if (open) { unread = 0; $('#unread').classList.add('hidden'); $('#chatInput').focus(); }
+  setTimeout(layout, 0);
+}
+$('#chatForm').onsubmit = e => {
+  e.preventDefault(); const t = $('#chatInput').value.trim(); if (!t) return;
+  send('chat', { text: t }); $('#chatInput').value = '';
+};
+
+// ---------- вход/выход ----------
+function setHint(t, err) { $('#hint').textContent = t; $('#hint').classList.toggle('err', !!err); }
+async function join() {
+  const name = $('#name').value.trim(); const room = $('#room').value.trim().replace(/[^\p{L}\p{N}_\-.]/gu, '-');
+  if (!name) { $('#name').focus(); return setHint('Введите имя', true); }
+  if (!room) { $('#room').focus(); return setHint('Введите название комнаты', true); }
+  S.name = name; save(); roomName = room;
+  ac().resume?.();
+  history.replaceState(null, '', `?room=${encodeURIComponent(room)}`);
+  $('#lobby').classList.add('hidden'); $('#call').classList.remove('hidden');
+  $('#roomTitle').textContent = room;
+  selfTile = makeTile('self', name + ' (вы)');
+  selfTile.video.muted = true;
+  inCall = true; renderSelf(); renderButtons();
+  connect();
+}
+function leave() {
+  leaving = true; inCall = false; es?.close();
+  peers.forEach(p => p.pc.close());
+  [local.audio, local.video].forEach(t => t?.stop()); screen?.getTracks().forEach(t => t.stop());
+  location.href = location.pathname;
+}
+addEventListener('beforeunload', () => { leaving = true; es?.close(); });
+
+// ---------- диалог настроек ----------
+function openSettings() {
+  $('#sRes').value = S.res; $('#sFps').value = S.fps; $('#sScr').value = S.scr;
+  $('#sEc').checked = S.ec; $('#sNs').checked = S.ns; $('#sAgc').checked = S.agc; $('#sMirror').checked = S.mirror;
+  $('#sJoinMuted').checked = S.joinMuted; $('#sJoinNoCam').checked = S.joinNoCam;
+  fillDevices(); renderSelf(); $('#dlg').showModal(); $('#sPrev').play().catch(() => {});
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('act', x === b));
+  document.querySelectorAll('[data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
+});
+$('#dlgClose').onclick = () => $('#dlg').close();
+$('#dlg').onclick = e => { if (e.target === $('#dlg')) $('#dlg').close(); };
+$('#sCam').onchange = e => { S.cam = e.target.value; save(); reacquire('video'); };
+$('#sMic').onchange = e => { S.mic = e.target.value; save(); reacquire('audio'); };
+$('#sSpk').onchange = e => { S.spk = e.target.value; save(); document.querySelectorAll('#grid video').forEach(applySink); };
+$('#sRes').onchange = e => { S.res = e.target.value; save(); reacquire('video'); };
+$('#sFps').onchange = e => { S.fps = e.target.value; save(); reacquire('video'); };
+$('#sScr').onchange = e => { S.scr = e.target.value; save(); if (screen) screen.getVideoTracks()[0].contentHint = S.scr; };
+for (const [id, k] of [['#sEc', 'ec'], ['#sNs', 'ns'], ['#sAgc', 'agc']]) $(id).onchange = e => { S[k] = e.target.checked; save(); reacquire('audio'); };
+$('#sMirror').onchange = e => { S.mirror = e.target.checked; save(); renderSelf(); };
+$('#sJoinMuted').onchange = e => { S.joinMuted = e.target.checked; save(); };
+$('#sJoinNoCam').onchange = e => { S.joinNoCam = e.target.checked; save(); };
+if (!('setSinkId' in HTMLMediaElement.prototype)) $('#spkFld').classList.add('hidden');
+$('#testSnd').onclick = () => {
+  const ctx = ac(); ctx.resume?.();
+  const dest = ctx.createMediaStreamDestination(), o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = 660; g.gain.setValueAtTime(.25, ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .8);
+  o.connect(g).connect(dest); o.start(); o.stop(ctx.currentTime + .8);
+  const a = new Audio(); a.srcObject = dest.stream; applySink(a); a.play();
+};
+
+// ---------- привязки ----------
+$('#lSet').innerHTML = $('#bSet').innerHTML = IC.gear;
+$('#bScreen').innerHTML = IC.screen; $('#bLeave').innerHTML = IC.leave;
+$('#bChat').insertAdjacentHTML('afterbegin', IC.chat);
+$('#lMic').onclick = $('#bMic').onclick = toggleMic;
+$('#lCam').onclick = $('#bCam').onclick = toggleCam;
+$('#lSet').onclick = $('#bSet').onclick = openSettings;
+$('#bScreen').onclick = toggleScreen;
+$('#bHand').onclick = toggleHand;
+$('#bChat').onclick = () => toggleChat();
+$('#chatClose').onclick = () => toggleChat(false);
+$('#bLeave').onclick = leave;
+$('#join').onclick = join;
+$('#name').oninput = renderSelf;
+for (const i of ['#name', '#room']) $(i).onkeydown = e => { if (e.key === 'Enter') join(); };
+$('#copy').onclick = async () => {
+  const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomName)}`;
+  try { await navigator.clipboard.writeText(url); toast('Ссылка скопирована'); } catch { prompt('Ссылка на комнату:', url); }
+};
+addEventListener('keydown', e => {
+  if (!inCall || e.target.matches('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'KeyM') toggleMic();
+  if (e.code === 'KeyV') toggleCam();
+});
+if (!navigator.mediaDevices?.getDisplayMedia) $('#bScreen').classList.add('hidden');
+
+// ---------- старт ----------
+$('#name').value = S.name;
+$('#room').value = new URLSearchParams(location.search).get('room') || Math.random().toString(36).slice(2, 8);
+renderButtons(); renderSelf();
+initMedia();
+</script>
+</body>
+</html>
