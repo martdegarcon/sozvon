@@ -46,6 +46,8 @@ function createServer(opts = {}) {
   const rooms = new Map();    // name -> { peers, history, game, gameTimer, timer }
   const tokens = new Map();   // token -> peer
   const departed = new Map(); // id -> { token, roomName, timer } — для восстановления после обрыва
+  // Статистика соединений (без IP и имён): как люди соединяются и сколько не может
+  const net = { since: new Date().toISOString(), connected: { lan: 0, p2p: 0, relay: 0, unknown: 0 }, failed: 0, resets: 0, gaveUp: 0, noStun: 0, byDevice: {}, recent: [] };
 
   function sse(res, event, data) {
     if (res.destroyed) return;
@@ -189,6 +191,25 @@ function createServer(opts = {}) {
         broadcast(room, 'state', { id: p.id, state: p.state }, p.id);
         break;
       }
+      case 'diag': {
+        const d = msg.data || {};
+        if (!['connected', 'failed', 'reset', 'gave-up'].includes(d.state)) break;
+        const route = ['lan', 'p2p', 'relay'].includes(d.route) ? d.route : null;
+        const ua = ['ios', 'android', 'desktop'].includes(d.ua) ? d.ua : 'other';
+        const c = d.cands || {};
+        if (d.state === 'connected') net.connected[route || 'unknown']++;
+        else if (d.state === 'failed') net.failed++;
+        else if (d.state === 'reset') net.resets++;
+        else net.gaveUp++;
+        if (d.state !== 'connected' && !(+c.srflx)) net.noStun++;
+        const dev = (net.byDevice[ua] ||= { ok: 0, bad: 0 });
+        dev[d.state === 'connected' ? 'ok' : 'bad']++;
+        const ev = { t: new Date().toISOString().slice(5, 19), state: d.state, route, proto: String(d.proto || '').slice(0, 4), rtt: Number.isFinite(d.rtt) ? d.rtt : null,
+          host: +c.host || 0, srflx: +c.srflx || 0, relay: +c.relay || 0, attempts: +d.attempts || 0, ua };
+        net.recent.push(ev); if (net.recent.length > 60) net.recent.shift();
+        if (d.state !== 'connected') console.log('[net]', JSON.stringify(ev));
+        break;
+      }
       case 'game': {
         const d = msg.data || {};
         try {
@@ -256,7 +277,7 @@ function createServer(opts = {}) {
     if (req.method === 'GET' && u.pathname === '/health') {
       let peers = 0; for (const r of rooms.values()) peers += r.peers.size;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ ok: true, rooms: rooms.size, peers, uptime: Math.round(process.uptime()) }));
+      return res.end(JSON.stringify({ ok: true, rooms: rooms.size, peers, uptime: Math.round(process.uptime()), turn: !!(cfg.env.TURN_HOST && cfg.env.TURN_SECRET), net }));
     }
     if (req.method === 'GET') return serveStatic(req, res, u);
     res.writeHead(405); res.end();

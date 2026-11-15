@@ -337,3 +337,24 @@ test('фоновая уборка подчищает комнаты, даже е
     assert.ok(!s.srv.rooms.has('sweep'));
   } finally { await s.close(); }
 });
+
+test('диагностика соединений копится в /health без IP и имён', async () => {
+  const s = await startServer();
+  try {
+    const a = await connect(s.port, 'diag', 'Секретное Имя');
+    await send(s.port, a, [
+      { type: 'diag', data: { peer: 'x', state: 'connected', route: 'p2p', proto: 'udp', rtt: 42, cands: { host: 2, srflx: 1, relay: 0 }, ua: 'android' } },
+      { type: 'diag', data: { peer: 'y', state: 'failed', cands: { host: 2, srflx: 0, relay: 0 }, ua: 'ios', candidate: '192.168.1.5' } },
+      { type: 'diag', data: { state: 'взлом' } },
+    ]);
+    const h = await (await fetch(`http://127.0.0.1:${s.port}/health`)).json();
+    assert.equal(h.net.connected.p2p, 1);
+    assert.equal(h.net.failed, 1);
+    assert.equal(h.net.noStun, 1, 'видно, что STUN не ответил');
+    assert.deepEqual(h.net.byDevice.ios, { ok: 0, bad: 1 });
+    assert.equal(h.net.recent.length, 2, 'мусорные события отброшены');
+    const json = JSON.stringify(h);
+    assert.ok(!json.includes('192.168') && !json.includes('Секретное'), 'никаких IP и имён');
+    assert.equal(h.turn, false);
+  } finally { await s.close(); }
+});

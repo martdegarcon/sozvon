@@ -278,6 +278,11 @@ details.lc summary{cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0
 @keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:none}}
 .hand .card{transition:transform .15s,box-shadow .15s}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#unmute{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:70;border:0;border-radius:12px;padding:12px 18px;background:#e0892a;color:#fff;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer;animation:pop .4s}
+audio.rpeer{display:none}
+.netrow{display:flex;justify-content:space-between;gap:10px;background:var(--bg);border-radius:10px;padding:9px 11px;margin-bottom:6px;font-size:14px}
+.netrow small{color:var(--mute)}
+.netrow .ok{color:var(--green)}.netrow .warn{color:#e0b52a}.netrow .bad{color:#ff8a8a}
 /* --- settings --- */
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -385,7 +390,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 <dialog id="dlg">
   <div class="dlg-h">Настройки <button id="dlgClose" aria-label="Закрыть">×</button></div>
   <div class="dlg-b">
-    <div class="tabs"><button data-tab="dev" class="act">Устройства</button><button data-tab="audio">Звук</button><button data-tab="video">Видео</button></div>
+    <div class="tabs"><button data-tab="dev" class="act">Устройства</button><button data-tab="audio">Звук</button><button data-tab="video">Видео</button><button data-tab="net">Связь</button></div>
     <div data-pane="dev">
       <div class="prevS"><video id="sPrev" autoplay playsinline muted></video></div>
       <label class="fld"><span>Камера</span><select id="sCam"></select></label>
@@ -399,6 +404,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
       <label class="chk"><input type="checkbox" id="sAgc"><div>Автоусиление громкости<small>Выравнивает громкость голоса</small></div></label>
       <label class="chk"><input type="checkbox" id="sJoinMuted"><div>Входить с выключенным микрофоном</div></label>
     </div>
+    <div data-pane="net" class="hidden"><div id="netPanel"></div></div>
     <div data-pane="video" class="hidden">
       <label class="fld"><span>Качество камеры</span><select id="sRes"><option value="360">360p (экономия трафика)</option><option value="720">720p HD</option><option value="1080">1080p Full HD</option></select></label>
       <label class="fld"><span>Частота кадров</span><select id="sFps"><option>15</option><option>24</option><option>30</option></select></label>
@@ -408,6 +414,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     </div>
   </div>
 </dialog>
+<button id="unmute" class="hidden">🔊 Нажмите, чтобы включить звук собеседников</button>
 <div id="toast"></div>
 
 <script>
@@ -918,42 +925,148 @@ function applySink(v) { if (S.spk && v.setSinkId) v.setSinkId(S.spk).catch(() =>
 // ---------- WebRTC (perfect negotiation, mesh) ----------
 function createPeer(id, name, state, initiator) {
   if (peers.has(id)) return peers.get(id);
-  const pc = new RTCPeerConnection({ iceServers });
   const tile = makeTile(id, name);
-  const p = { id, name, pc, tile, state: state || {}, polite: me > id, makingOffer: false, ignoreOffer: false, stream: new MediaStream(), q: Promise.resolve() };
+  // Видео всегда без звука — такое браузеры автозапускают всегда, картинка не пропадёт.
+  // Звук — отдельный <audio>: если браузер его заблокирует, покажем кнопку «включить звук».
+  tile.video.muted = true;
+  const audio = document.createElement('audio');
+  audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.className = 'rpeer';
+  tile.el.append(audio);
+  const p = { id, name, tile, audio, state: state || {}, polite: me > id, attempts: 0, cands: { host: 0, srflx: 0, relay: 0 }, q: Promise.resolve() };
   peers.set(id, p);
-  tile.video.srcObject = p.stream; applySink(tile.video);
-  tile.el.querySelector('.st').textContent = 'Подключение…';
+  applySink(audio);
+  wirePc(p, initiator);
   applyState(p);
-
+  return p;
+}
+// Создаёт (или пересоздаёт) RTCPeerConnection для участника
+function wirePc(p, initiator) {
+  if (p.pc) { try { p.pc.close(); } catch {} }
+  clearTimeout(p.connTimer); clearTimeout(p.discTimer);
+  const pc = new RTCPeerConnection({ iceServers, iceCandidatePoolSize: 2 });
+  p.pc = pc; p.makingOffer = false; p.ignoreOffer = false; p.q = Promise.resolve();
+  p.stream = new MediaStream(); p.cands = { host: 0, srflx: 0, relay: 0 }; p.route = null;
+  const { tile } = p;
+  tile.video.srcObject = p.stream;
+  setStatus(p, 'Подключение…');
   pc.ontrack = e => {
-    p.stream.getTracks().filter(t => t.kind === e.track.kind).forEach(t => p.stream.removeTrack(t));
-    p.stream.addTrack(e.track);
-    tile.video.srcObject = p.stream; tile.video.play().catch(() => {});
-    if (e.track.kind === 'audio') addMeter(id, e.track, l => tile.el.classList.toggle('speaking', l > .1 && p.state.mic !== false));
-    if (e.track.kind === 'video') { e.track.onmute = () => applyState(p); e.track.onunmute = () => applyState(p); }
+    if (pc !== p.pc) return;
+    if (e.track.kind === 'audio') {
+      p.audio.srcObject = new MediaStream([e.track]);
+      playAudio(p.audio);
+      addMeter(p.id, e.track, l => tile.el.classList.toggle('speaking', l > .1 && p.state.mic !== false));
+    } else {
+      p.stream.getVideoTracks().forEach(t => p.stream.removeTrack(t));
+      p.stream.addTrack(e.track);
+      tile.video.srcObject = p.stream; tile.video.play().catch(() => {});
+      e.track.onmute = () => applyState(p); e.track.onunmute = () => applyState(p);
+    }
   };
-  pc.onicecandidate = e => { if (e.candidate) send('signal', { candidate: e.candidate }, id); };
+  pc.onicecandidate = e => {
+    if (pc !== p.pc) return;
+    if (e.candidate) { const t = e.candidate.type || (/ typ (\w+)/.exec(e.candidate.candidate) || [])[1]; if (t in p.cands) p.cands[t]++; send('signal', { candidate: e.candidate }, p.id); }
+  };
   pc.onnegotiationneeded = async () => {
-    try { p.makingOffer = true; await pc.setLocalDescription(); send('signal', { description: pc.localDescription }, id); }
+    try { p.makingOffer = true; await pc.setLocalDescription(); send('signal', { description: pc.localDescription }, p.id); }
     catch (e) { console.warn(e); } finally { p.makingOffer = false; }
   };
   pc.onconnectionstatechange = () => {
-    const s = pc.connectionState;
-    tile.el.querySelector('.st').textContent = s === 'connected' ? '' : s === 'failed' ? 'Нет связи — переподключаю…' : s === 'disconnected' ? 'Связь прервалась…' : 'Подключение…';
-    if (s === 'failed') pc.restartIce();
-    if (s === 'connected') tuneSenders();
+    if (pc !== p.pc) return;
+    const st = pc.connectionState;
+    clearTimeout(p.discTimer);
+    if (st === 'connected') {
+      clearTimeout(p.connTimer); p.attempts = 0; setStatus(p, ''); tuneSenders();
+      routeOf(pc).then(r => { p.route = r; reportDiag(p, 'connected'); renderNetPanel(); });
+    } else if (st === 'disconnected') {
+      setStatus(p, 'Связь прервалась…');
+      p.discTimer = setTimeout(() => { if (p.pc === pc && pc.connectionState !== 'connected') pc.restartIce(); }, 4000);
+    } else if (st === 'failed') {
+      setStatus(p, 'Нет связи — переподключаю…');
+      reportDiag(p, 'failed');
+      pc.restartIce();
+      armReset(p, 10000);
+    }
+    renderNetPanel();
   };
+  armReset(p, 20000);                       // не соединились за 20 с — пересоздаём соединение
   if (initiator) {
     pc.addTransceiver('audio', { direction: 'sendrecv' });
     pc.addTransceiver('video', { direction: 'sendrecv' });
     attachLocal(p);
   }
-  return p;
+}
+function setStatus(p, t) { p.tile.el.querySelector('.st').textContent = t; }
+function armReset(p, ms) {
+  clearTimeout(p.connTimer);
+  const pc = p.pc;
+  p.connTimer = setTimeout(() => {
+    if (p.pc !== pc || pc.connectionState === 'connected' || !peers.has(p.id)) return;
+    if (p.attempts >= 3) {
+      setStatus(p, 'Не удаётся соединиться: сеть блокирует звонок');
+      reportDiag(p, 'gave-up');
+      return;
+    }
+    p.attempts++;
+    reportDiag(p, 'reset');
+    send('signal', { reset: true }, p.id);  // собеседник тоже пересоздаст соединение
+    wirePc(p, me < p.id);
+  }, ms);
+}
+// Через что идёт связь: напрямую, через STUN (P2P через интернет) или через TURN-ретранслятор
+async function routeOf(pc) {
+  try {
+    const st = await pc.getStats();
+    let pair = null;
+    st.forEach(r => { if (r.type === 'transport' && r.selectedCandidatePairId) pair = st.get(r.selectedCandidatePairId); });
+    if (!pair) st.forEach(r => { if (r.type === 'candidate-pair' && (r.selected || (r.nominated && r.state === 'succeeded'))) pair = r; });
+    if (!pair) return null;
+    const l = st.get(pair.localCandidateId), r = st.get(pair.remoteCandidateId);
+    const relay = l?.candidateType === 'relay' || r?.candidateType === 'relay';
+    const lan = l?.candidateType === 'host' && r?.candidateType === 'host';
+    return { route: relay ? 'relay' : lan ? 'lan' : 'p2p', proto: l?.protocol || '', rtt: pair.currentRoundTripTime != null ? Math.round(pair.currentRoundTripTime * 1000) : null };
+  } catch { return null; }
+}
+function reportDiag(p, state) {
+  send('diag', { peer: p.id, state, route: p.route?.route || null, proto: p.route?.proto || null, rtt: p.route?.rtt ?? null, cands: p.cands, attempts: p.attempts, ua: /iPhone|iPad/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : 'desktop' });
+}
+// --- вкладка «Связь» в настройках: с кем и как соединены ---
+const RU_ROUTE = { lan: ['Напрямую (одна сеть)', 'ok'], p2p: ['Напрямую через интернет', 'ok'], relay: ['Через TURN-сервер', 'warn'] };
+const RU_STATE = { new: 'подготовка', connecting: 'соединяемся…', connected: 'соединено', disconnected: 'прервалось', failed: 'не удалось', closed: 'закрыто' };
+async function renderNetPanel(refresh) {
+  const box = $('#netPanel');
+  if (!box || !$('#dlg').open) return;
+  if (refresh) await Promise.all([...peers.values()].map(async p => { if (p.pc.connectionState === 'connected') p.route = await routeOf(p.pc); }));
+  const hasTurn = iceServers.some(x => [].concat(x.urls).some(u => /^turns?:/.test(u)));
+  const anySrflx = [...peers.values()].some(p => p.cands.srflx > 0);
+  const rows = [...peers.values()].map(p => {
+    const st = p.pc.connectionState, r = p.route && RU_ROUTE[p.route.route];
+    const cls = st === 'connected' ? (r ? r[1] : 'ok') : st === 'failed' || p.attempts >= 3 ? 'bad' : 'warn';
+    return `<div class="netrow"><div><b>${esc(p.name)}</b><br><small>${st === 'connected' && r ? r[0] + (p.route.proto ? ' · ' + p.route.proto.toUpperCase() : '') : 'Попыток: ' + p.attempts}</small></div>
+      <div style="text-align:right"><span class="${cls}">${RU_STATE[st] || st}</span><br><small>${p.route?.rtt != null ? 'пинг ' + p.route.rtt + ' мс' : ''}</small></div></div>`;
+  }).join('') || '<p class="hint">В комнате пока никого нет</p>';
+  box.innerHTML = rows + `<p class="hint" style="margin-top:10px">
+    STUN (узнать свой адрес): ${peers.size ? (anySrflx ? '<span style="color:var(--green)">работает</span>' : '<span style="color:#ff8a8a">не отвечает — похоже, провайдер блокирует</span>') : '—'}<br>
+    TURN-ретранслятор: ${hasTurn ? '<span style="color:var(--green)">настроен</span>' : 'не настроен — при блокировках часть людей может не соединиться'}</p>`;
+}
+setInterval(() => { if ($('#dlg').open && !$('[data-pane="net"]').classList.contains('hidden')) renderNetPanel(true); }, 3000);
+
+// --- звук: если браузер не дал включить автоматически — кнопка ---
+function playAudio(el) {
+  const pr = el.play();
+  if (pr?.catch) pr.catch(() => $('#unmute').classList.remove('hidden'));
+}
+function unlockAudio() {
+  ac().resume?.();
+  let ok = true;
+  peers.forEach(p => { if (p.audio.srcObject) p.audio.play().catch(() => { ok = false; }); });
+  setTimeout(() => { if (ok) $('#unmute').classList.add('hidden'); }, 200);
 }
 function onSignal({ from, data }) {
   const p = peers.get(from) || createPeer(from, 'Гость', {}, false);
+  if (data.reset) { wirePc(p, me < p.id); return; }   // собеседник пересоздал соединение — делаем то же
+  const pcAtCall = p.pc;
   p.q = p.q.then(async () => {
+    if (pcAtCall !== p.pc) return;
     const pc = p.pc;
     try {
       if (data.description) {
@@ -982,6 +1095,8 @@ function applyState(p) {
 }
 function removePeer(id) {
   const p = peers.get(id); if (!p) return;
+  clearTimeout(p.connTimer); clearTimeout(p.discTimer);
+  try { p.audio.srcObject = null; } catch {}
   p.pc.close(); removeMeter(id);
   if (pinned === p.tile.el) pin(null);
   p.tile.el.remove(); peers.delete(id); layout(); tuneSenders();
@@ -1523,6 +1638,8 @@ $('#gameBody').addEventListener('click', e => {
   }
 });
 $('#gameBody').addEventListener('toggle', e => { if (e.target.matches('details.lc')) spyLocOpen = e.target.open; }, true);
+$('#unmute').onclick = unlockAudio;
+document.addEventListener('pointerdown', () => { if (!$('#unmute').classList.contains('hidden')) unlockAudio(); }, true);
 $('#bGames').onclick = () => toggleGames();
 // «Ещё» на телефоне: второстепенные кнопки спрятаны в меню
 $('#bMore').onclick = e => {
@@ -1579,6 +1696,7 @@ function openSettings() {
   fillDevices(); renderSelf(); $('#dlg').showModal(); $('#sPrev').play().catch(() => {});
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  if (b.dataset.tab === 'net') setTimeout(() => renderNetPanel(true), 0);
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('act', x === b));
   document.querySelectorAll('[data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
 });
@@ -1586,7 +1704,7 @@ $('#dlgClose').onclick = () => $('#dlg').close();
 $('#dlg').onclick = e => { if (e.target === $('#dlg')) $('#dlg').close(); };
 $('#sCam').onchange = e => { S.cam = e.target.value; save(); reacquire('video'); };
 $('#sMic').onchange = e => { S.mic = e.target.value; save(); reacquire('audio'); };
-$('#sSpk').onchange = e => { S.spk = e.target.value; save(); document.querySelectorAll('#grid video').forEach(applySink); };
+$('#sSpk').onchange = e => { S.spk = e.target.value; save(); document.querySelectorAll('audio.rpeer').forEach(applySink); };
 $('#sRes').onchange = e => { S.res = e.target.value; save(); reacquire('video'); };
 $('#sFps').onchange = e => { S.fps = e.target.value; save(); reacquire('video'); };
 $('#sScr').onchange = e => { S.scr = e.target.value; save(); if (screen) screen.getVideoTracks()[0].contentHint = S.scr; };
