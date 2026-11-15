@@ -358,3 +358,21 @@ test('диагностика соединений копится в /health бе
     assert.equal(h.turn, false);
   } finally { await s.close(); }
 });
+
+test('TURN: временные учётки по секрету, TLS на 443', async () => {
+  const crypto = require('crypto');
+  const s = await startServer({ env: { TURN_HOST: 'turn.example.ru', TURN_SECRET: 'sekret', TURN_TLS: '1', STUN_URLS: '' } });
+  try {
+    const a = await connect(s.port, 'turn', 'A');
+    const ice = a.events[0].data.iceServers;
+    const turn = ice.find(x => x.username);
+    assert.ok(turn.urls.includes('turns:turn.example.ru:443?transport=tcp'));
+    assert.ok(turn.urls.includes('turn:turn.example.ru:3478?transport=udp'));
+    const exp = +turn.username.split(':')[0];
+    assert.ok(exp > Date.now() / 1000 + 3600, 'учётка живёт сутки');
+    assert.equal(turn.credential, crypto.createHmac('sha1', 'sekret').update(turn.username).digest('base64'));
+    assert.ok(!JSON.stringify(a.events[0].data).includes('sekret'), 'сам секрет клиенту не уходит');
+    const h = await (await fetch(`http://127.0.0.1:${s.port}/health`)).json();
+    assert.equal(h.turn, true);
+  } finally { await s.close(); }
+});

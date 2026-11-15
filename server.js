@@ -20,7 +20,8 @@ function iceServers(env) {
       const username = `${Math.floor(Date.now() / 1000) + 86400}:sozvon`;
       const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
       const urls = [`turn:${host}:3478?transport=udp`, `turn:${host}:3478?transport=tcp`];
-      if (env.TURN_TLS === '1') urls.push(`turns:${host}:5349?transport=tcp`);
+      // TLS на 443 выглядит для провайдера как обычный HTTPS — так звонок труднее заблокировать
+      if (env.TURN_TLS === '1') urls.push(`turns:${host}:${env.TURN_TLS_PORT || 443}?transport=tcp`);
       list.push({ urls, username, credential });
     }
   }
