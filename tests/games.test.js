@@ -266,3 +266,133 @@ test('лобби: создать, войти, лимит мест, старт т
   assert.equal(g.aborted, b.name);
   assert.throws(() => G.create('шахматы', a), /Неизвестная/);
 });
+
+/* ---------------- Шпион ---------------- */
+const { Spy, SPY_LOCATIONS } = G;
+const spyOf = s => s.players.find(p => p.spy);
+const civ = s => s.players.filter(p => !p.spy);
+
+test('шпион: ровно один шпион, остальные знают одну локацию и разные роли', () => {
+  for (let n = 3; n <= 8; n++) for (let seed = 1; seed < 30; seed++) {
+    const s = Spy.init(P(n), { rng: rng(seed * 10 + n) });
+    assert.equal(s.players.filter(p => p.spy).length, 1);
+    assert.ok(SPY_LOCATIONS[s.location]);
+    for (const p of civ(s)) assert.ok(SPY_LOCATIONS[s.location].includes(p.role));
+    if (n <= 6) assert.equal(new Set(civ(s).map(p => p.role)).size, n - 1, 'роли не повторяются, пока хватает');
+  }
+  assert.ok(Object.keys(SPY_LOCATIONS).length >= 25);
+});
+
+test('шпион: шпион не видит локацию, остальные не знают, кто шпион', () => {
+  const s = Spy.init(P(5), { rng: rng(5) });
+  const sv = Spy.view(s, spyOf(s).id);
+  assert.deepEqual(sv.me, { spy: true });
+  assert.equal(sv.location, null);
+  assert.ok(!JSON.stringify(sv).includes(`"${s.location}",`) || sv.locations.includes(s.location), 'локация видна шпиону только в общем списке');
+  assert.ok(!JSON.stringify({ ...sv, locations: [] }).includes(s.location), 'локация шпиону не утекла');
+  const cv = Spy.view(s, civ(s)[0].id);
+  assert.equal(cv.me.location, s.location);
+  assert.ok(cv.players.every(p => !('spy' in p)), 'кто шпион — не видно');
+  const watcher = Spy.view(s, 'зритель');
+  assert.equal(watcher.me, null);
+  assert.ok(!JSON.stringify({ ...watcher, locations: [] }).includes(s.location));
+});
+
+test('шпион: угадал локацию — победа шпиона, ошибся — победа мирных; мирный угадывать не может', () => {
+  const s = Spy.init(P(4), { rng: rng(1) });
+  assert.throws(() => Spy.move(s, civ(s)[0].id, { t: 'guess', location: s.location }), /только шпион/);
+  Spy.move(s, spyOf(s).id, { t: 'guess', location: s.location });
+  assert.ok(s.over); assert.equal(s.winner, 'spy');
+
+  const w = Spy.init(P(4), { rng: rng(2) });
+  const wrong = Object.keys(SPY_LOCATIONS).find(l => l !== w.location);
+  Spy.move(w, spyOf(w).id, { t: 'guess', location: wrong });
+  assert.equal(w.winner, 'civil');
+  const v = Spy.view(w, civ(w)[0].id);
+  assert.equal(v.location, w.location, 'в конце всё раскрывается');
+  assert.ok(v.players.some(p => p.spy));
+});
+
+test('шпион: единогласное обвинение шпиона — победа мирных', () => {
+  const s = Spy.init(P(4), { rng: rng(3) });
+  const [a, b, c] = civ(s), spy = spyOf(s);
+  Spy.move(s, a.id, { t: 'accuse', target: spy.id });
+  assert.ok(s.accusation);
+  assert.throws(() => Spy.move(s, spy.id, { t: 'vote', yes: false }), /не нужно/, 'обвиняемый не голосует');
+  Spy.move(s, b.id, { t: 'vote', yes: true });
+  assert.ok(!s.over);
+  Spy.move(s, c.id, { t: 'vote', yes: true });
+  assert.ok(s.over); assert.equal(s.winner, 'civil');
+});
+
+test('шпион: обвинили мирного — побеждает шпион; одно «нет» — обвинение отменяется', () => {
+  const s = Spy.init(P(4), { rng: rng(4) });
+  const [a, b, c] = civ(s);
+  Spy.move(s, a.id, { t: 'accuse', target: b.id });
+  Spy.move(s, c.id, { t: 'vote', yes: false });
+  assert.equal(s.accusation, null, 'не прошло');
+  assert.ok(!s.over);
+  assert.throws(() => Spy.move(s, a.id, { t: 'accuse', target: c.id }), /уже обвиняли/, 'одно обвинение на игру');
+  Spy.move(s, c.id, { t: 'accuse', target: b.id });
+  for (const p of s.players) if (p.id !== b.id && p.id !== c.id) Spy.move(s, p.id, { t: 'vote', yes: true });
+  assert.ok(s.over); assert.equal(s.winner, 'spy');
+});
+
+test('шпион: не проголосовал за 30 с — считается «против», игра не висит', () => {
+  const s = Spy.init(P(3), { rng: rng(6), now: 0, timeout: 30000 });
+  const [a, b] = civ(s);
+  Spy.move(s, a.id, { t: 'accuse', target: b.id }, 1000);
+  assert.equal(s.deadline, 31000);
+  assert.ok(Spy.tick(s, 31001));
+  assert.equal(s.accusation, null);
+  assert.ok(!s.over);
+});
+
+test('шпион: время раунда вышло → общее голосование → большинство решает, ничья в пользу шпиона', () => {
+  const s = Spy.init(P(4), { rng: rng(7), now: 0, roundMs: 1000 });
+  assert.ok(Spy.tick(s, 1001));
+  assert.equal(s.phase, 'final');
+  const spy = spyOf(s), [a, b, c] = civ(s);
+  Spy.move(s, a.id, { t: 'final', target: spy.id }, 1100);
+  Spy.move(s, b.id, { t: 'final', target: spy.id }, 1100);
+  Spy.move(s, c.id, { t: 'final', target: a.id }, 1100);
+  assert.throws(() => Spy.move(s, a.id, { t: 'final', target: b.id }), /нельзя/);
+  Spy.move(s, spy.id, { t: 'final', target: a.id }, 1100);
+  assert.ok(s.over);
+  assert.equal(s.winner, 'spy', '2:2 — ничья, шпион ускользнул');
+
+  const t = Spy.init(P(4), { rng: rng(7), now: 0, roundMs: 1000 });
+  Spy.tick(t, 1001);
+  const ts = spyOf(t);
+  civ(t).forEach(p => Spy.move(t, p.id, { t: 'final', target: ts.id }, 1100));
+  assert.ok(!t.over, 'ждём голос шпиона или таймер');
+  assert.ok(Spy.tick(t, t.finalEnds + 1));
+  assert.equal(t.winner, 'civil');
+});
+
+test('шпион: фаззинг 2000 случайных партий — всегда заканчиваются, победитель определён', () => {
+  const locs = Object.keys(SPY_LOCATIONS);
+  for (let seed = 1; seed <= 2000; seed++) {
+    const r = rng(seed), n = 3 + (seed % 6);
+    let now = 0;
+    const s = Spy.init(P(n), { rng: r, now, roundMs: 5000, timeout: 1000 });
+    for (let step = 0; step < 500 && !s.over; step++) {
+      const moves = [];
+      for (const p of s.players) {
+        const L = Spy.legal(s, p.id); if (!L) continue;
+        if (r() < 0.05) L.accuse.forEach(t => moves.push([p.id, { t: 'accuse', target: t }]));
+        if (L.vote) moves.push([p.id, { t: 'vote', yes: r() < 0.7 }]);
+        if (L.guess && r() < 0.02) moves.push([p.id, { t: 'guess', location: locs[Math.floor(r() * locs.length)] }]);
+        L.final.forEach(t => moves.push([p.id, { t: 'final', target: t }]));
+      }
+      now += Math.floor(r() * 400);
+      if (!moves.length || r() < 0.3) { Spy.tick(s, now); continue; }
+      const [pid, m] = moves[Math.floor(r() * moves.length)];
+      Spy.move(s, pid, m, now);
+    }
+    if (!s.over) { Spy.tick(s, 1e12); Spy.tick(s, 2e12); Spy.tick(s, 3e12); }
+    assert.ok(s.over, `партия seed=${seed} не закончилась`);
+    assert.ok(s.winner === 'spy' || s.winner === 'civil');
+    assert.ok(s.reason);
+  }
+});

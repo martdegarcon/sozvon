@@ -114,7 +114,6 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
   .ctl[data-tip]:hover::after{display:none}
   #call header{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));gap:8px}
   #copy .long{display:none}#copy .short{display:inline}
-  #toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}
 }
 .ctl{position:relative;width:52px;height:52px;border-radius:50%;border:0;background:var(--panel2);display:grid;place-items:center;cursor:pointer;transition:background .15s}
 .ctl:hover{background:#2b303b}
@@ -180,6 +179,24 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
 .ttt button:disabled{cursor:default}
 .ttt button.can:hover{background:#2b303b}
 
+.spycard{border-radius:14px;padding:18px 14px;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;background:linear-gradient(135deg,#1f3b2a,#173024);border:1px solid #2f6b47}
+.spycard.spy{background:linear-gradient(135deg,#3b1f2a,#2a1720);border-color:#7a2f47}
+.spycard.hid{background:var(--panel2);border-color:var(--line)}
+.spycard .big{font-size:24px;font-weight:700;margin:4px 0}
+.spycard small{color:var(--mute)}
+.acc{background:#3a2a12;border:1px solid #e0892a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--panel2);border-radius:10px;padding:8px 10px}
+.prow .nm2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .tag{font-size:12px;color:var(--mute)}
+.prow .sb{border:0;border-radius:8px;padding:7px 10px;background:#e0892a;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap}
+.prow .sb.sure{background:var(--red)}
+.prow .sb.vote{background:var(--acc)}
+.locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.locs button{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:8px 6px;font-size:13px;cursor:pointer;text-align:center}
+.locs button.x{text-decoration:line-through;opacity:.4}
+.locs button.pick{border-color:#ffd84d;background:#3a3412}
+details.lc summary{cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0}
+.gres{text-align:center;font-size:20px;font-weight:700;padding:6px 0}
 /* --- settings --- */
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -204,6 +221,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 #toast{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));width:max-content;max-width:min(440px,92vw);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:50;pointer-events:none}
 #toast div{background:#000d;border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-size:14px;animation:fade 4s forwards}
 @keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%,85%{opacity:1;transform:none}100%{opacity:0}}
+@media(max-width:700px),(max-height:500px){#toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}}
 </style>
 </head>
 <body>
@@ -796,6 +814,7 @@ function renderGame() {
   if (!g) {
     body.innerHTML = `<div class="gl">
       <button class="gcard" data-act="create:durak"><span class="ico">🃏</span><span><b>Дурак</b><small>Подкидной, 36 карт · 2–6 игроков</small></span></button>
+      <button class="gcard" data-act="create:spy"><span class="ico">🕵️</span><span><b>Шпион</b><small>Вычислите шпиона, не выдав локацию · 3–8 игроков</small></span></button>
       <button class="gcard" data-act="create:ttt"><span class="ico">⭕</span><span><b>Крестики-нолики</b><small>3×3 · 2 игрока</small></span></button>
     </div><p class="glog">Выберите игру — остальные участники звонка получат приглашение.</p>`;
     return;
@@ -812,14 +831,14 @@ function renderGame() {
       <p class="glog">${isHost ? 'Когда все присоединятся — нажмите «Начать».' : 'Нажмите «Играть», чтобы участвовать.'}</p>`;
     return;
   }
-  if (g.type === 'durak') renderDurak(g, body); else renderTTT(g, body);
+  if (g.type === 'durak') renderDurak(g, body); else if (g.type === 'spy') renderSpy(g, body); else renderTTT(g, body);
   const after = g.status === 'over'
     ? `<div class="gbtns">${isHost ? `<button class="gbtn" data-act="start">Ещё партию</button>` : ''}<button class="gbtn sec" data-act="close">${isHost || !g.host ? 'Закрыть игру' : 'Закрыть'}</button></div>`
     : (isHost ? `<div class="gbtns"><button class="gbtn sec" data-act="close">Прервать партию</button></div>` : '');
   body.insertAdjacentHTML('beforeend', after);
   const st = g.state;
   if (st && !st.over && st.deadline) {
-    const tick = () => { const el = body.querySelector('.tm[data-dl]'); if (!el) return; const sec = Math.max(0, Math.ceil((st.deadline - Date.now()) / 1000)); el.textContent = `⏱ ${sec}`; el.classList.toggle('low', sec <= 10); };
+    const tick = () => { const el = body.querySelector('.tm[data-dl]'); if (!el) return; const sec = Math.max(0, Math.ceil((st.deadline - Date.now()) / 1000)); el.textContent = '⏱ ' + (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : sec); el.classList.toggle('low', sec <= 10); };
     tick(); gameTimerIv = setInterval(tick, 1000);
   }
 }
@@ -882,11 +901,97 @@ function renderTTT(g, body) {
     <div class="ttt">${cells}</div>`;
 }
 
+
+// ---------- Шпион ----------
+let spyLocOpen = false, spyHidden = false, spyGuess = false, spyPick = null, spySure = null, spyGameKey = '';
+const spyCross = new Set();
+function renderSpy(g, body) {
+  const s = g.state, L = s.legal, nm = id => esc(s.players.find(p => p.id === id)?.name || '?');
+  const key = s.first + s.endsAt;                    // новая партия — сбрасываем локальные пометки
+  if (key !== spyGameKey) { spyGameKey = key; spyCross.clear(); spyHidden = false; spyGuess = false; spyPick = null; spySure = null; }
+  if (!L?.guess) { spyGuess = false; spyPick = null; }
+  const acc = s.accusation;
+  let msg, mine = false;
+  if (s.over) msg = g.aborted ? `Партия прервана: ${esc(g.aborted)} вышел(-ла)` : 'Партия окончена';
+  else if (acc) { msg = `Голосование: ${acc.yes} из ${acc.need}`; mine = !!L?.vote; }
+  else if (s.phase === 'final') { msg = L?.final.length ? 'Время вышло! Кто шпион?' : 'Ждём голоса остальных'; mine = !!L?.final.length; }
+  else msg = 'Задавайте вопросы друг другу';
+
+  let card = '';
+  if (s.me && !s.over) {
+    card = spyHidden
+      ? `<div class="spycard hid" data-act="spyhide"><div class="big">🙈</div><small>Карточка скрыта — нажмите, чтобы показать</small></div>`
+      : s.me.spy
+        ? `<div class="spycard spy" data-act="spyhide"><small>Ваша роль</small><div class="big">🕵️ Вы — шпион</div><small>Слушайте ответы и вычислите локацию. Назвать её можно в любой момент. Нажмите, чтобы скрыть</small></div>`
+        : `<div class="spycard" data-act="spyhide"><small>Локация</small><div class="big">📍 ${esc(s.me.location)}</div><small>Ваша роль: <b>${esc(s.me.role)}</b> · нажмите, чтобы скрыть</small></div>`;
+  } else if (!s.me && !s.over) card = '<p class="glog">Вы смотрите партию как зритель</p>';
+
+  let accHTML = '';
+  if (acc && !s.over) {
+    accHTML = `<div class="acc"><div><b>${nm(acc.by)}</b> обвиняет <b>${nm(acc.target)}</b>. ${acc.target === me ? 'Вас обвиняют — ждём голосования…' : 'Это шпион?'}</div>
+      <div class="glog" style="text-align:left">Нужно единогласно: ${acc.yes}/${acc.need} «за». Одно «против» — обвинение снимается.</div>
+      ${L?.vote ? `<div class="gbtns"><button class="gbtn" data-act="spyvote:1">Да, шпион</button><button class="gbtn sec" data-act="spyvote:0">Нет</button></div>` : ''}</div>`;
+  }
+
+  const rows = s.players.map(p => {
+    let btn = '';
+    if (L?.final.includes(p.id)) btn = `<button class="sb vote" data-act="spyfinal:${p.id}">Это шпион</button>`;
+    else if (L?.accuse.includes(p.id)) btn = spySure === p.id
+      ? `<button class="sb sure" data-act="spyaccuse:${p.id}">Точно? Обвинить</button>`
+      : `<button class="sb" data-act="spyask:${p.id}">Обвинить</button>`;
+    const tags = [];
+    if (s.over) { if (p.spy) tags.push('🕵️ шпион'); else if (p.role) tags.push(esc(p.role)); }
+    else {
+      if (p.id === s.first && s.phase === 'play') tags.push('спрашивает первым');
+      if (p.accused) tags.push('уже обвинял');
+      if (s.phase === 'final' && p.votedFinal) tags.push('✓ проголосовал');
+    }
+    return `<div class="prow"><span class="nm2">${esc(p.name)}${p.id === me ? ' (вы)' : ''}</span><span class="tag">${tags.join(' · ')}</span>${btn}</div>`;
+  }).join('');
+
+  const locBtns = s.locations.map(l => `<button class="${spyCross.has(l) ? 'x' : ''} ${spyPick === l ? 'pick' : ''} ${s.over && l === s.location ? 'pick' : ''}" data-act="spyloc:${esc(l)}">${esc(l)}</button>`).join('');
+  let guessHTML = '';
+  if (L?.guess) {
+    guessHTML = spyGuess
+      ? `<div class="acc"><div><b>Назовите локацию</b> — угадаете, вы победили; ошибётесь — проиграли.</div><div class="locs">${locBtns}</div>
+         <div class="gbtns"><button class="gbtn" data-act="spyconfirm" ${spyPick ? '' : 'disabled'}>${spyPick ? 'Это ' + esc(spyPick) + '!' : 'Выберите локацию'}</button><button class="gbtn sec" data-act="spyguess">Отмена</button></div></div>`
+      : `<div class="gbtns"><button class="gbtn warn" data-act="spyguess">🕵️ Я знаю локацию!</button></div>`;
+  }
+  const result = s.over && !g.aborted ? `<div class="gres">${s.winner === 'spy' ? '🕵️ Шпион победил' : '🎉 Мирные победили'}</div><p class="glog" style="font-size:14px">${esc(s.reason)}<br>Локация: <b>${esc(s.location)}</b></p>` : '';
+  body.innerHTML = `
+    <div class="gstatus ${mine ? 'my' : ''}"><span>${msg}</span>${!s.over ? `<span class="tm" data-dl></span>` : ''}</div>
+    ${result}${card}${accHTML}${guessHTML}
+    <div class="plist">${rows}</div>
+    <div class="glog">${s.log.map(esc).join(' · ')}</div>
+    ${spyGuess ? '' : `<details class="lc" ${s.over || spyLocOpen ? 'open' : ''}><summary>Все локации (${s.locations.length}) — нажмите, чтобы вычеркнуть</summary><div class="locs">${locBtns}</div></details>`}`;
+}
+function spyClick(act, arg) {
+  switch (act) {
+    case 'spyhide': spyHidden = !spyHidden; break;
+    case 'spyask': spySure = arg; setTimeout(() => { if (spySure === arg) { spySure = null; scheduleRender(); } }, 4000); break;
+    case 'spyaccuse': spySure = null; gsend('move', { move: { t: 'accuse', target: arg } }); break;
+    case 'spyvote': gsend('move', { move: { t: 'vote', yes: arg === '1' } }); break;
+    case 'spyfinal': gsend('move', { move: { t: 'final', target: arg } }); break;
+    case 'spyguess': spyGuess = !spyGuess; spyPick = null; break;
+    case 'spyloc': if (spyGuess) spyPick = arg; else spyCross.has(arg) ? spyCross.delete(arg) : spyCross.add(arg); break;
+    case 'spyconfirm': if (spyPick) { gsend('move', { move: { t: 'guess', location: spyPick } }); spyGuess = false; } break;
+    default: return false;
+  }
+  scheduleRender();
+  return true;
+}
+
 // Один обработчик на всю панель: быстрые нажатия без лишних подписок
 $('#gameBody').addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const [act, arg] = el.dataset.act.split(/:(.*)/s);
   const g = gameView, L = g?.state?.legal;
+  if (act.startsWith('spy')) {
+    // details/summary не должен сворачиваться при клике по локации
+    if (act === 'spyloc') e.preventDefault();
+    spyClick(act, arg && act === 'spyloc' ? el.textContent : arg);
+    return;
+  }
   switch (act) {
     case 'create': gsend('create', { game: arg }); break;
     case 'join': case 'leave': case 'start': case 'close': gsend(act); break;
@@ -904,6 +1009,7 @@ $('#gameBody').addEventListener('click', e => {
     case 'target': if (selCard) { gsend('move', { move: { t: 'defend', card: selCard, idx: +arg } }); selCard = null; } break;
   }
 });
+$('#gameBody').addEventListener('toggle', e => { if (e.target.matches('details.lc')) spyLocOpen = e.target.open; }, true);
 $('#bGames').onclick = () => toggleGames();
 $('#gamesClose').onclick = () => toggleGames(false);
 

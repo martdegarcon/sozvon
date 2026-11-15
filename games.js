@@ -221,8 +221,180 @@ const TicTacToe = {
   },
 };
 
+/* ============================== ШПИОН ============================== */
+// Все, кроме шпиона, знают локацию (и свою роль в ней). Задают друг другу вопросы голосом в звонке.
+// Любой может один раз за игру обвинить — нужно единогласие остальных. Шпион может в любой момент назвать локацию.
+// Когда время раунда вышло — общее голосование.
+const SPY_LOCATIONS = {
+  'Самолёт': ['Пилот', 'Стюардесса', 'Пассажир эконом-класса', 'Пассажир бизнес-класса', 'Бортмеханик'],
+  'Банк': ['Кассир', 'Охранник', 'Управляющий', 'Клиент', 'Грабитель'],
+  'Пляж': ['Спасатель', 'Отдыхающий', 'Продавец кукурузы', 'Фотограф', 'Сёрфер'],
+  'Казино': ['Крупье', 'Охранник', 'Шулер', 'Хайроллер', 'Бармен'],
+  'Цирк': ['Клоун', 'Дрессировщик', 'Акробат', 'Зритель', 'Фокусник'],
+  'Школа': ['Учитель', 'Ученик', 'Директор', 'Охранник', 'Уборщица'],
+  'Больница': ['Хирург', 'Медсестра', 'Пациент', 'Терапевт', 'Санитар'],
+  'Ресторан': ['Шеф-повар', 'Официант', 'Посетитель', 'Музыкант', 'Ресторанный критик'],
+  'Театр': ['Актёр', 'Режиссёр', 'Суфлёр', 'Зритель', 'Гардеробщица'],
+  'Отель': ['Портье', 'Горничная', 'Постоялец', 'Швейцар', 'Управляющий'],
+  'Военная база': ['Генерал', 'Солдат', 'Повар', 'Часовой', 'Военврач'],
+  'Подводная лодка': ['Капитан', 'Акустик', 'Кок', 'Штурман', 'Матрос'],
+  'Космическая станция': ['Командир', 'Инженер', 'Учёный', 'Космический турист', 'Пилот'],
+  'Пиратский корабль': ['Капитан', 'Кок', 'Юнга', 'Пленник', 'Боцман'],
+  'Поезд дальнего следования': ['Машинист', 'Проводник', 'Пассажир', 'Контролёр', 'Продавец пирожков'],
+  'Полицейский участок': ['Следователь', 'Дежурный', 'Задержанный', 'Адвокат', 'Журналист'],
+  'Супермаркет': ['Кассир', 'Покупатель', 'Охранник', 'Грузчик', 'Мерчендайзер'],
+  'Университет': ['Профессор', 'Студент', 'Ректор', 'Аспирант', 'Лаборант'],
+  'Посольство': ['Посол', 'Охранник', 'Переводчик', 'Турист', 'Дипломат'],
+  'Кинотеатр': ['Киномеханик', 'Зритель', 'Кассир', 'Продавец попкорна', 'Уборщик'],
+  'Спа-салон': ['Массажист', 'Клиент', 'Косметолог', 'Администратор', 'Мастер маникюра'],
+  'Зоопарк': ['Смотритель', 'Ветеринар', 'Посетитель', 'Фотограф', 'Экскурсовод'],
+  'Стройка': ['Прораб', 'Каменщик', 'Крановщик', 'Архитектор', 'Инспектор'],
+  'Ночной клуб': ['Диджей', 'Бармен', 'Охранник', 'Танцор', 'Тусовщик'],
+  'Полярная станция': ['Начальник станции', 'Метеоролог', 'Повар', 'Радист', 'Исследователь'],
+  'Баня': ['Банщик', 'Завсегдатай', 'Новичок', 'Продавец веников', 'Администратор'],
+  'Дача': ['Хозяин', 'Сосед', 'Гость', 'Ребёнок', 'Бабушка'],
+  'Метро': ['Машинист', 'Пассажир', 'Дежурная у эскалатора', 'Уличный музыкант', 'Полицейский'],
+  'Аэропорт': ['Пограничник', 'Пассажир', 'Диспетчер', 'Таможенник', 'Грузчик'],
+  'Свадьба': ['Жених', 'Невеста', 'Тамада', 'Гость', 'Фотограф'],
+};
+const SPY_LIST = Object.keys(SPY_LOCATIONS);
+
+const Spy = {
+  title: 'Шпион', min: 3, max: 8,
+
+  init(players, { rng = Math.random, now = Date.now(), timeout = 30000, roundMs } = {}) {
+    if (players.length < 3 || players.length > 8) fail('Нужно от 3 до 8 игроков');
+    const location = SPY_LIST[Math.floor(rng() * SPY_LIST.length)];
+    const spyIdx = Math.floor(rng() * players.length);
+    const roles = shuffle([...SPY_LOCATIONS[location]], rng);
+    let k = 0;
+    const ps = players.map((p, i) => ({ id: p.id, name: p.name, spy: i === spyIdx, role: i === spyIdx ? null : roles[k++ % roles.length] }));
+    const round = roundMs || (players.length <= 4 ? 6 : players.length <= 6 ? 8 : 10) * 60000;
+    const s = {
+      players: ps, location, phase: 'play', first: ps[Math.floor(rng() * ps.length)].id,
+      endsAt: now + round, voteMs: timeout, accusation: null, accused: [], finalVotes: {}, finalEnds: 0,
+      over: false, winner: null, reason: '', deadline: 0, log: [],
+    };
+    s.deadline = s.endsAt;
+    return s;
+  },
+
+  legal(s, pid) {
+    const me = s.players.find(p => p.id === pid);
+    if (!me || s.over) return null;
+    const others = s.players.filter(p => p.id !== pid).map(p => p.id);
+    const L = { accuse: [], vote: false, guess: false, final: [] };
+    if (s.phase === 'play' && !s.accusation) {
+      if (!s.accused.includes(pid)) L.accuse = others;
+      L.guess = me.spy;
+    }
+    if (s.accusation && s.accusation.target !== pid && !(pid in s.accusation.votes)) L.vote = true;
+    if (s.phase === 'final' && !(pid in s.finalVotes)) L.final = others;
+    return L;
+  },
+
+  move(s, pid, m, now = Date.now()) {
+    const L = Spy.legal(s, pid);
+    if (!L) fail(s.over ? 'Игра окончена' : 'Вы не участвуете в партии');
+    const me = s.players.find(p => p.id === pid);
+    switch (m && m.t) {
+      case 'accuse':
+        if (!L.accuse.includes(m.target)) fail(s.accused.includes(pid) ? 'Вы уже обвиняли в этой игре' : 'Сейчас нельзя обвинять');
+        s.accused.push(pid);
+        s.accusation = { by: pid, target: m.target, votes: { [pid]: true }, deadline: now + s.voteMs };
+        s.log.push(`${me.name} обвиняет ${nameOf(s, m.target)}`);
+        spyResolveVote(s, now);
+        break;
+      case 'vote':
+        if (!L.vote) fail('Сейчас не нужно голосовать');
+        s.accusation.votes[pid] = !!m.yes;
+        spyResolveVote(s, now);
+        break;
+      case 'guess':
+        if (!L.guess) fail('Назвать локацию может только шпион');
+        if (!SPY_LOCATIONS[m.location]) fail('Нет такой локации');
+        if (m.location === s.location) spyEnd(s, 'spy', `Шпион угадал локацию: ${s.location}`);
+        else spyEnd(s, 'civil', `Шпион ошибся: назвал «${m.location}», а это ${s.location}`);
+        break;
+      case 'final':
+        if (!L.final.includes(m.target)) fail('Сейчас нельзя голосовать за этого игрока');
+        s.finalVotes[pid] = m.target;
+        if (Object.keys(s.finalVotes).length === s.players.length) spyResolveFinal(s);
+        break;
+      default: fail('Неизвестный ход');
+    }
+    spyDeadline(s);
+  },
+
+  tick(s, now = Date.now()) {
+    if (s.over || now < s.deadline) return false;
+    if (s.accusation && now >= s.accusation.deadline) {
+      // кто не успел проголосовать — «против»
+      for (const p of s.players) if (p.id !== s.accusation.target && !(p.id in s.accusation.votes)) s.accusation.votes[p.id] = false;
+      spyResolveVote(s, now);
+    }
+    if (!s.over && s.phase === 'play' && !s.accusation && now >= s.endsAt) {
+      s.phase = 'final'; s.finalEnds = now + 60000; s.log.push('Время вышло — общее голосование');
+    } else if (!s.over && s.phase === 'final' && now >= s.finalEnds) {
+      spyResolveFinal(s);
+    }
+    spyDeadline(s);
+    return true;
+  },
+
+  view(s, viewer) {
+    const me = s.players.find(p => p.id === viewer);
+    const acc = s.accusation;
+    return {
+      phase: s.phase, over: s.over, winner: s.winner, reason: s.reason, first: s.first,
+      endsAt: s.endsAt, finalEnds: s.finalEnds, deadline: s.deadline, log: s.log.slice(-3),
+      locations: SPY_LIST,
+      me: me ? (me.spy ? { spy: true } : { spy: false, location: s.location, role: me.role }) : null,
+      players: s.players.map(p => ({ id: p.id, name: p.name, accused: s.accused.includes(p.id), votedFinal: p.id in s.finalVotes,
+        ...(s.over ? { spy: p.spy, role: p.role } : {}) })),
+      accusation: acc ? { by: acc.by, target: acc.target, yes: Object.values(acc.votes).filter(Boolean).length,
+        need: s.players.length - 1, voted: Object.keys(acc.votes), deadline: acc.deadline } : null,
+      finalVotes: s.over ? s.finalVotes : null,
+      location: s.over ? s.location : null,
+      legal: Spy.legal(s, viewer),
+    };
+  },
+};
+const nameOf = (s, id) => (s.players.find(p => p.id === id) || {}).name || '?';
+function spyEnd(s, winner, reason) {
+  s.over = true; s.winner = winner; s.reason = reason; s.accusation = null; s.phase = 'over'; s.log.push(reason);
+}
+function spyResolveVote(s, now) {
+  const a = s.accusation, voters = s.players.filter(p => p.id !== a.target);
+  const no = voters.some(p => a.votes[p.id] === false);
+  const allYes = voters.every(p => a.votes[p.id] === true);
+  const target = s.players.find(p => p.id === a.target);
+  if (allYes) {
+    if (target.spy) spyEnd(s, 'civil', `Шпиона вычислили: это ${target.name}`);
+    else spyEnd(s, 'spy', `${target.name} — не шпион! Шпион побеждает`);
+  } else if (no) {
+    s.log.push(`Обвинение против ${target.name} не прошло`);
+    s.accusation = null;
+    if (s.phase === 'play' && now >= s.endsAt) { s.phase = 'final'; s.finalEnds = now + 60000; }
+  }
+}
+function spyResolveFinal(s) {
+  const count = {};
+  for (const t of Object.values(s.finalVotes)) count[t] = (count[t] || 0) + 1;
+  const sorted = Object.entries(count).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length || (sorted[1] && sorted[1][1] === sorted[0][1])) return spyEnd(s, 'spy', 'Голоса разделились — шпион ускользнул');
+  const target = s.players.find(p => p.id === sorted[0][0]);
+  if (target.spy) spyEnd(s, 'civil', `Шпиона вычислили: это ${target.name}`);
+  else spyEnd(s, 'spy', `Выбрали ${target.name}, но это не шпион`);
+}
+function spyDeadline(s) {
+  if (s.over) { s.deadline = 0; return; }
+  // пока идёт обвинение, таймер раунда «ждёт» — сначала решаем судьбу обвинения
+  s.deadline = s.accusation ? s.accusation.deadline : s.phase === 'final' ? s.finalEnds : s.endsAt;
+}
+
 /* ============================== Общая обвязка комнаты ============================== */
-const ENGINES = { durak: Durak, ttt: TicTacToe };
+const ENGINES = { durak: Durak, ttt: TicTacToe, spy: Spy };
 
 function create(type, host) {
   if (!ENGINES[type]) fail('Неизвестная игра');
@@ -284,4 +456,4 @@ function view(g, viewer) {
     players: g.players, aborted: g.aborted, state: g.s ? E.view(g.s, viewer) : null };
 }
 
-module.exports = { GameError, Durak, TicTacToe, ENGINES, create, handle, onLeave, tick, deadline, view, beats, fullDeck, suit, rank };
+module.exports = { GameError, Durak, TicTacToe, Spy, SPY_LOCATIONS, ENGINES, create, handle, onLeave, tick, deadline, view, beats, fullDeck, suit, rank };
