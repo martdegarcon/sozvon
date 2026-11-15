@@ -110,7 +110,8 @@ async def main():
         await m.click('[data-act="join"]')
         await a.wait_for_function('gameView.players.length === 2'); await a.click('[data-act="start"]')
         await m.wait_for_function('gameView.status === "playing"')
-        for _ in range(40):
+        fails = 0
+        for _ in range(60):
             v = await gv(a)
             if v['status'] != 'playing': break
             for p in (a, m):
@@ -120,10 +121,15 @@ async def main():
                     n = sum(1 for x in v['state']['board'] if x)
                     if await tap(p, f'[data-act="cell:{L["place"][0]}"]'):
                         await a.wait_for_function('n => gameView.status !== "playing" || gameView.state.board.filter(Boolean).length > n', arg=n, timeout=5000)
+                    else:
+                        fails += 1
                     break
             else:
                 await a.wait_for_timeout(100)
-        await m.wait_for_function('gameView.status === "over"', timeout=5000)
+        if (await gv(m))['status'] != 'over':
+            print('ДИАГНОСТИКА:', fails, 'неудачных нажатий;', await a.evaluate('JSON.stringify([gameView.status, gameView.state && gameView.state.board, gameView.state && gameView.state.turn, me])'), await m.evaluate('JSON.stringify([gameView.status, gameView.state && gameView.state.legal, me])'))
+            await m.screenshot(path=OUT + 'ttt_fail.png')
+        await m.wait_for_function('gameView.status === "over"', timeout=10000)
         v = await gv(m)
         assert v['status'] == 'over', v['status']
         print('✓ крестики-нолики доиграны:', 'ничья' if v['state']['draw'] else 'есть победитель')

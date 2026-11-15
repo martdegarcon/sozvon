@@ -37,7 +37,9 @@ function createServer(opts = {}) {
     graceMs: 20000,        // сколько ждём переподключения, прежде чем выкинуть из игры
     pingMs: 15000,         // пульс SSE — клиент по нему понимает, что связь жива
     rate: 200, burst: 600, // лимит сообщений от одного участника (в секунду / запас)
-    roomTtlMs: 10 * 60 * 1000,
+    roomTtlMs: 5 * 60 * 1000, // пустая комната живёт 5 минут, потом удаляется целиком
+    maxRooms: +process.env.MAX_ROOMS || 2000, // защита от «бесконечного» создания комнат
+    sweepMs: 60 * 1000,       // фоновая уборка — страховка на случай, если таймер не сработал
     env: process.env,
     ...opts,
   };
@@ -75,20 +77,33 @@ function createServer(opts = {}) {
 
   function getRoom(name) {
     let room = rooms.get(name);
-    if (!room) { room = { name, peers: new Map(), history: [], game: null, gameTimer: null, timer: null }; rooms.set(name, room); }
+    if (!room) {
+      if (rooms.size >= cfg.maxRooms) return null;
+      room = { name, peers: new Map(), history: [], game: null, gameTimer: null, timer: null, emptySince: 0 };
+      rooms.set(name, room);
+    }
     clearTimeout(room.timer);
+    room.emptySince = 0;
     return room;
+  }
+  function dropRoom(room) {
+    clearTimeout(room.timer); clearTimeout(room.gameTimer);
+    room.game = null; room.history = [];
+    if (rooms.get(room.name) === room) rooms.delete(room.name);
   }
   function maybeDropRoom(room) {
     if (room.peers.size) return;
     clearTimeout(room.timer);
-    room.timer = setTimeout(() => {
-      if (room.peers.size) return;
-      clearTimeout(room.gameTimer);
-      rooms.delete(room.name);
-    }, cfg.roomTtlMs);
+    room.emptySince = Date.now();
+    room.timer = setTimeout(() => { if (!room.peers.size) dropRoom(room); }, cfg.roomTtlMs);
     room.timer.unref?.();
   }
+  // Страховочная уборка: всё, что пустует дольше TTL, удаляется (вместе с играми и историей чата)
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const room of rooms.values()) if (!room.peers.size && room.emptySince && now - room.emptySince >= cfg.roomTtlMs) dropRoom(room);
+  }, cfg.sweepMs);
+  sweeper.unref?.();
 
   function detach(room, peer) {
     clearInterval(peer.ping);
@@ -112,6 +127,7 @@ function createServer(opts = {}) {
     req.socket.setKeepAlive(true, 10000);
 
     const room = getRoom(roomName);
+    if (!room) { sse(res, 'busy', {}); return res.end(); }
     let id = crypto.randomBytes(6).toString('hex');
     let token = crypto.randomBytes(24).toString('hex');
 
@@ -237,7 +253,11 @@ function createServer(opts = {}) {
     const u = new URL(req.url, 'http://local');
     if (req.method === 'GET' && u.pathname === '/events') return handleEvents(req, res, u);
     if (req.method === 'POST' && u.pathname === '/send') return handleSend(req, res);
-    if (req.method === 'GET' && u.pathname === '/health') { res.writeHead(200); return res.end('ok'); }
+    if (req.method === 'GET' && u.pathname === '/health') {
+      let peers = 0; for (const r of rooms.values()) peers += r.peers.size;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, rooms: rooms.size, peers, uptime: Math.round(process.uptime()) }));
+    }
     if (req.method === 'GET') return serveStatic(req, res, u);
     res.writeHead(405); res.end();
   });
@@ -246,6 +266,7 @@ function createServer(opts = {}) {
   server.requestTimeout = 0; // SSE-соединения живут долго
   server.rooms = rooms;
   server.on('close', () => {
+    clearInterval(sweeper);
     for (const r of rooms.values()) { clearTimeout(r.timer); clearTimeout(r.gameTimer); for (const p of r.peers.values()) clearInterval(p.ping); }
     for (const d of departed.values()) clearTimeout(d.timer);
   });

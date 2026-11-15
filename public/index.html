@@ -125,8 +125,48 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
 
 
 /* --- игры --- */
-#games{width:440px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel);min-height:0}
-@media(max-width:700px),(max-height:500px){#games{position:fixed;inset:0;bottom:var(--fh,70px);width:auto;z-index:6;padding-top:env(safe-area-inset-top)}}
+#games{display:flex;flex-direction:column;background:var(--panel);min-height:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+#grid:not(.free) #games{display:none}
+#gameBody{container-type:size;container-name:gbody}
+@media(hover:none){#grid.free .tile .fs,#grid.free .tile .rz{display:none}}
+#games .chat-h{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+/* --- свободная раскладка окон --- */
+#grid.free{display:block;padding:0;overflow:hidden}
+#grid.free .win{position:absolute;margin:0;aspect-ratio:auto;transition:left .34s cubic-bezier(.2,.8,.2,1),top .34s cubic-bezier(.2,.8,.2,1),width .34s cubic-bezier(.2,.8,.2,1),height .34s cubic-bezier(.2,.8,.2,1),box-shadow .2s}
+#grid.free .win.hidden{display:none}
+#grid.free .tile{cursor:grab;touch-action:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#grid.free .win.drag{transition:box-shadow .2s;cursor:grabbing;box-shadow:0 22px 50px rgba(0,0,0,.65);opacity:.97}
+#grid.snapping .win{transition:none}
+.win .rz{display:none;position:absolute;right:0;bottom:0;width:26px;height:26px;cursor:nwse-resize;z-index:6;touch-action:none;background:linear-gradient(135deg,transparent 55%,rgba(255,255,255,.6) 55%,rgba(255,255,255,.6) 62%,transparent 62%,transparent 72%,rgba(255,255,255,.6) 72%,rgba(255,255,255,.6) 79%,transparent 79%)}
+#grid.free .win .rz{display:block}
+#grid.free .tile .rz{opacity:0;transition:opacity .15s}#grid.free .tile:hover .rz,#grid.free .tile.drag .rz{opacity:1}
+@media(hover:none){#grid.free .tile .rz{opacity:.7}}
+/* меню раскладок и «Ещё» */
+.sheet{position:fixed;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:0 16px 40px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:6px;min-width:250px}
+#layoutMenu{top:56px;right:16px}
+.sheet h4{margin:4px 6px 2px;font-size:12px;color:var(--mute);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.sheet .opt{display:flex;align-items:center;gap:10px;border:1px solid transparent;background:var(--panel2);border-radius:10px;padding:9px 10px;cursor:pointer;text-align:left;width:100%}
+.sheet .opt:hover{border-color:var(--line)}
+.sheet .opt.act{border-color:var(--acc);background:#22305a}
+.sheet .opt .pv{width:46px;height:30px;flex:none;position:relative;background:#0b0d12;border-radius:5px;overflow:hidden}
+.sheet .opt .pv i{position:absolute;background:#5b8cff;border-radius:2px;opacity:.9}.sheet .opt .pv i.g{background:#3ecf8e}
+.sheet .hint{font-size:12px;color:var(--mute);padding:2px 6px}
+#moreSheet{left:8px;right:8px;bottom:calc(var(--fh,70px) + 8px);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#moreSheet.hidden,#layoutMenu.hidden{display:none}
+#moreSheet button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:12px;border:0;background:var(--panel2);font-size:12px;cursor:pointer;position:relative}
+#moreSheet button svg{width:22px;height:22px}
+#moreSheet button .badge{position:absolute;top:6px;right:10px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px}
+#bMore{display:none;font-size:22px;line-height:1}
+#bLayout .li{font-size:15px}
+@media(max-width:700px),(max-height:500px){
+  #bScreen,#bHand,#bChat,#bSet{display:none}
+  #bMore{display:grid}
+  footer{gap:12px}
+  footer .ctl{width:50px;height:50px}
+  footer .ctl.leave{width:64px}
+  #layoutMenu{top:auto;left:8px;right:8px;bottom:calc(var(--fh,70px) + 8px)}
+  #bLayout .long{display:none}
+}
 #gameBody{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
 #gameBody>*{flex-shrink:0}
 .gl{display:grid;gap:10px}
@@ -223,6 +263,21 @@ details.lc summary{cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0
 .gbtn.liar{background:var(--red);font-size:17px}
 .gbtns.stick{position:sticky;bottom:-12px;margin:0 -12px -12px;padding:14px 12px 12px;background:linear-gradient(transparent,var(--panel) 35%);z-index:2}
 @media(max-width:700px),(max-height:500px){.lbar{padding:10px;gap:6px}.lbar .tcard{font-size:16px}}
+/* --- анимации игр --- */
+@keyframes flipin{0%{transform:perspective(500px) rotateY(90deg) scale(.9);filter:brightness(.4)}100%{transform:none;filter:none}}
+.card.flipin{animation:flipin .5s cubic-bezier(.2,.8,.2,1) backwards}
+@keyframes bang{0%{box-shadow:inset 0 0 0 999px rgba(255,40,40,.55)}10%{transform:translate(-10px,4px)}20%{transform:translate(9px,-5px)}30%{transform:translate(-7px,3px)}45%{transform:translate(5px,-2px)}60%{transform:translate(-3px,1px)}100%{box-shadow:inset 0 0 0 999px rgba(255,40,40,0);transform:none}}
+@keyframes phew{0%,100%{transform:none}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+#games.bang{animation:bang .8s ease-out}
+#games.phew{animation:phew .25s ease-in-out 2}
+.gstatus.my.pulse{animation:myturn 1.6s ease-out}
+@keyframes myturn{0%{box-shadow:0 0 0 0 rgba(91,140,255,.8)}100%{box-shadow:0 0 0 14px rgba(91,140,255,0)}}
+.ttt button.win{animation:winpulse 1s ease-in-out infinite alternate}
+@keyframes winpulse{to{background:#2a7a4f}}
+.gres{animation:pop .5s cubic-bezier(.2,.8,.2,1)}
+@keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:none}}
+.hand .card{transition:transform .15s,box-shadow .15s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* --- settings --- */
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -248,6 +303,18 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 #toast div{background:#000d;border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-size:14px;animation:fade 4s forwards}
 @keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%,85%{opacity:1;transform:none}100%{opacity:0}}
 @media(max-width:700px),(max-height:500px){#toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}body.gopen #toast{bottom:calc(var(--fh,70px) + 96px)}}
+/* окно игры маленькое — компактный режим, чтобы рука с картами всегда помещалась */
+@container gbody (max-height:560px){
+  .board{min-height:86px;padding:8px 8px 22px;--w:36px;gap:8px}
+  .gstatus{padding:7px 10px;font-size:14px}
+  .opps{gap:5px}.opp{padding:3px 7px;font-size:12px;min-width:64px}
+  .lbar{padding:8px;gap:5px}.lbar .tcard{font-size:14px}.tcard .card,.pile .card{--w:34px}
+  .spycard{padding:10px}.spycard .big{font-size:19px}
+  .ttt{width:min(100%,230px)}.ttt button{font-size:34px}
+  .hand{padding-top:12px;min-height:70px}
+  .gbtn{padding:9px 10px}
+}
+@container gbody (max-height:420px){ .glog{display:none} .opps{display:none} }
 </style>
 </head>
 <body>
@@ -282,18 +349,23 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <span class="t" id="roomTitle"></span>
     <span class="c" id="count"></span>
     <span class="sp"></span>
+    <button class="ghost" id="bLayout" title="Расположение окон"><span class="li">▦</span><span class="long"> Раскладка</span></button>
     <button class="ghost" id="copy"><span class="long">Скопировать ссылку</span><span class="short">🔗 Ссылка</span></button>
   </header>
+  <div id="layoutMenu" class="sheet hidden"></div>
+  <div id="moreSheet" class="sheet hidden"></div>
   <main>
-    <div id="grid"></div>
+    <div id="grid">
+      <aside id="games" class="hidden win">
+        <div class="chat-h" title="Перетащите, чтобы передвинуть окно"><span id="gamesTitle">Игры</span> <button id="gamesClose" aria-label="Закрыть">×</button></div>
+        <div id="gameBody"></div>
+        <div class="rz" title="Потяните, чтобы изменить размер"></div>
+      </aside>
+    </div>
     <aside id="chat" class="hidden">
       <div class="chat-h">Чат <button id="chatClose" aria-label="Закрыть">×</button></div>
       <div id="msgs"></div>
       <form id="chatForm"><input id="chatInput" placeholder="Сообщение…" autocomplete="off" maxlength="4000"><button aria-label="Отправить">➤</button></form>
-    </aside>
-    <aside id="games" class="hidden">
-      <div class="chat-h"><span id="gamesTitle">Игры</span> <button id="gamesClose" aria-label="Закрыть">×</button></div>
-      <div id="gameBody"></div>
     </aside>
   </main>
   <footer>
@@ -304,6 +376,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <button class="ctl" id="bChat" data-tip="Чат"><span class="badge hidden" id="unread">0</span></button>
     <button class="ctl" id="bGames" data-tip="Игры"><span class="badge hidden" id="gbadge">!</span></button>
     <button class="ctl" id="bSet" data-tip="Настройки"></button>
+    <button class="ctl" id="bMore" data-tip="Ещё">⋯<span class="badge hidden" id="mbadge">!</span></button>
     <button class="ctl leave" id="bLeave" data-tip="Выйти"></button>
   </footer>
 </section>
@@ -547,30 +620,41 @@ function goFull(el) {
 function makeTile(id, name) {
   const el = document.createElement('div');
   el.className = 'tile novideo';
+  el.className = 'tile novideo win';
+  el.dataset.id = id;
   el.innerHTML = `<video autoplay playsinline></video><div class="avatar"><b></b></div><div class="st"></div><div class="hand">✋</div>
-    <div class="label"><span class="mo">${IC.micOff}</span><span class="nm"></span></div><button class="fs" title="На весь экран">${IC.full}</button>`;
+    <div class="label"><span class="mo">${IC.micOff}</span><span class="nm"></span></div><button class="fs" title="На весь экран">${IC.full}</button><div class="rz" title="Потяните, чтобы изменить размер"></div>`;
   const t = { el, video: el.querySelector('video') };
   setTileName(t, name);
   el.querySelector('.fs').onclick = e => { e.stopPropagation(); goFull(el); };
-  el.onclick = () => pin(pinned === el ? null : el);
+  el.onclick = () => {
+    if (el._dragged) return;                          // это было перетаскивание, а не клик
+    const g = $('#grid');
+    if (!g.classList.contains('free') || (layoutCtx() === 'call' && LY.call !== 'custom')) pin(pinned === el ? null : el);
+  };
   el.ondblclick = () => goFull(el);
-  $('#grid').append(el); layout();
+  $('#grid').insertBefore(el, $('#games')); layout();
   return t;
 }
 function setTileName(t, name) {
   t.el.querySelector('.nm').textContent = name;
+  t.el.dataset.key = t.el.dataset.id === 'self' ? 'self' : 'p:' + name;   // по имени — чтобы своя раскладка пережила переподключение
   const b = t.el.querySelector('.avatar b'); b.textContent = (name[0] || '?').toUpperCase(); b.style.background = `hsl(${hue(name)} 55% 45%)`;
 }
 function pin(el) {
   pinned?.classList.remove('pinned'); pinned = el; el?.classList.add('pinned');
-  $('#grid').classList.toggle('focus', !!el); layout();
+  $('#grid').classList.toggle('focus', !!el && !$('#grid').classList.contains('free')); layout();
 }
 function layout() {
-  const g = $('#grid'), n = g.children.length, GAP = 10;
-  const W = g.clientWidth - 24, H = g.clientHeight - 24;
-  const mobile = innerWidth <= 700 || innerHeight <= 500;
-  g.style.setProperty('--gh', g.clientHeight + 'px');
+  const g = $('#grid'), tiles = [...g.querySelectorAll('.tile')], n = tiles.length, GAP = 10;
   document.documentElement.style.setProperty('--fh', ($('footer')?.offsetHeight || 70) + 'px');
+  $('#count').textContent = `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'участник' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'участника' : 'участников'}`;
+  const preset = currentPreset();
+  if (preset) { applyFree(preset); return; }
+  leaveFree();
+  const W = g.clientWidth - 24, H = g.clientHeight - 24;
+  const mobile = isNarrow();
+  g.style.setProperty('--gh', g.clientHeight + 'px');
   g.classList.toggle('duo', mobile && n === 2 && !pinned);
   // пропорции плитки: на телефоне в портрете — вертикальные, иначе 16:9
   const portrait = mobile && H > W;
@@ -583,8 +667,251 @@ function layout() {
   }
   g.style.setProperty('--tw', Math.floor(bw) + 'px');
   g.style.setProperty('--th', Math.floor(bh) + 'px');
-  $('#count').textContent = `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'участник' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'участника' : 'участников'}`;
 }
+
+// ---------- раскладка окон: пресеты + свободное перетаскивание ----------
+const LS_LAYOUT = 'sozvon-layout';
+const LY = Object.assign({ call: 'auto', game: 'game-center', mgame: 'm-split', custom: { call: {}, game: {}, mgame: {} } }, (() => { try { return JSON.parse(localStorage.getItem(LS_LAYOUT) || '{}'); } catch { return {}; } })());
+LY.custom = Object.assign({ call: {}, game: {}, mgame: {} }, LY.custom);
+const saveLayout = () => { try { localStorage.setItem(LS_LAYOUT, JSON.stringify(LY)); } catch {} };
+const PRESETS = {
+  call: [['auto', 'Авто-сетка', [[0, 0, 48, 48], [52, 0, 48, 48], [0, 52, 48, 48], [52, 52, 48, 48]]],
+         ['speaker', 'Спикер крупно', [[0, 0, 100, 72], [0, 76, 31, 24], [34, 76, 31, 24], [68, 76, 32, 24]]]],
+  game: [['game-center', 'Игра в центре', [[0, 0, 20, 30], [0, 35, 20, 30], [24, 0, 52, 100, 1], [80, 0, 20, 30], [80, 35, 20, 30]]],
+         ['game-top', 'Камеры сверху', [[0, 0, 23, 24], [25.6, 0, 23, 24], [51.2, 0, 23, 24], [76.8, 0, 23, 24], [0, 28, 100, 72, 1]]],
+         ['game-side', 'Игра сбоку', [[0, 0, 33, 30], [0, 34, 33, 30], [0, 68, 33, 30], [36, 0, 64, 100, 1]]],
+         ['game-full', 'Игра на весь экран', [[0, 0, 100, 100, 1], [80, 4, 17, 20], [80, 28, 17, 20]]],
+         ['grid', 'Сетка', [[0, 0, 48, 48, 1], [52, 0, 48, 48], [0, 52, 48, 48], [52, 52, 48, 48]]]],
+  mgame: [['m-split', 'Камеры сверху и снизу', [[0, 0, 48, 18], [52, 0, 48, 18], [0, 22, 100, 56, 1], [0, 82, 48, 18], [52, 82, 48, 18]]],
+          ['m-full', 'Игра крупно', [[0, 0, 23, 12], [25.6, 0, 23, 12], [51.2, 0, 23, 12], [76.8, 0, 23, 12], [0, 15, 100, 85, 1]]]],
+};
+const gameOpen = () => !$('#games').classList.contains('hidden');
+const layoutCtx = () => !gameOpen() ? 'call' : isNarrow() ? 'mgame' : 'game';
+function currentPreset() {
+  const ctx = layoutCtx();
+  if (ctx === 'call') {
+    if (isNarrow()) return null;                       // звонок на телефоне без игры — адаптивная сетка
+    if (LY.call === 'auto') return pinned ? 'speaker' : 'grid';   // клик по вебке / демонстрация экрана → крупно
+    return LY.call;
+  }
+  return LY[ctx];
+}
+const winKey = el => el.id === 'games' ? 'game' : el.dataset.key;
+function orderedTiles() {
+  const tiles = [...$('#grid').querySelectorAll('.tile')];
+  const self = tiles.filter(t => t.dataset.id === 'self'), rest = tiles.filter(t => t.dataset.id !== 'self');
+  rest.sort((a, b) => (b.classList.contains('screen') - a.classList.contains('screen')) || (b === pinned) - (a === pinned));
+  return [...rest, ...self];
+}
+// Раскладываем элементы сеткой внутри прямоугольника, сохраняя пропорции и центрируя
+function pack(box, n, ratio, gap = 8) {
+  if (!n) return [];
+  let best = null;
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    let w = (box.w - gap * (cols - 1)) / cols, h = (box.h - gap * (rows - 1)) / rows;
+    if (w <= 0 || h <= 0) continue;
+    if (ratio) { if (w / h > ratio) w = h * ratio; else h = w / ratio; }
+    if (!best || w * h > best.w * best.h + 1) best = { cols, rows, w, h };
+  }
+  if (!best) best = { cols: n, rows: 1, w: box.w / n, h: box.h };
+  const out = [], { cols, rows, w, h } = best;
+  const y0 = box.y + (box.h - (rows * h + (rows - 1) * gap)) / 2;
+  for (let r = 0; r < rows; r++) {
+    const inRow = Math.min(cols, n - r * cols);
+    const x0 = box.x + (box.w - (inRow * w + (inRow - 1) * gap)) / 2;
+    for (let c = 0; c < inRow; c++) out.push({ x: x0 + c * (w + gap), y: y0 + r * (h + gap), w, h });
+  }
+  return out;
+}
+function presetRects(name, W, H, tiles, game) {
+  const P = isNarrow() ? 6 : 10, n = tiles.length, R = new Map();
+  const put = (els, rects) => els.forEach((el, i) => rects[i] && R.set(el, rects[i]));
+  const full = { x: P, y: P, w: W - 2 * P, h: H - 2 * P };
+  switch (name) {
+    case 'speaker': {
+      const main = tiles[0], rest = tiles.slice(1);
+      const sh = rest.length ? Math.min(180, Math.max(90, H * 0.2)) : 0;
+      put([main], pack({ x: P, y: P, w: W - 2 * P, h: H - 2 * P - (sh ? sh + P : 0) }, 1, 16 / 9));
+      put(rest, pack({ x: P, y: H - P - sh, w: W - 2 * P, h: sh }, rest.length, 16 / 9));
+      break;
+    }
+    case 'game-center': {
+      const cw = n ? Math.min(330, Math.max(150, W * 0.2)) : 0;
+      const left = tiles.slice(0, Math.ceil(n / 2)), right = tiles.slice(Math.ceil(n / 2));
+      put(left, pack({ x: P, y: P, w: cw, h: H - 2 * P }, left.length, 4 / 3));
+      put(right, pack({ x: W - P - cw, y: P, w: cw, h: H - 2 * P }, right.length, 4 / 3));
+      const gx = P + (left.length ? cw + P : 0), gw = W - gx - P - (right.length ? cw + P : 0);
+      if (game) R.set(game, { x: gx, y: P, w: gw, h: H - 2 * P });
+      break;
+    }
+    case 'game-top': {
+      const sh = n ? Math.min(230, Math.max(100, H * 0.25)) : 0;
+      put(tiles, pack({ x: P, y: P, w: W - 2 * P, h: sh }, n, 16 / 9));
+      if (game) R.set(game, { x: P, y: P + (sh ? sh + P : 0), w: W - 2 * P, h: H - 2 * P - (sh ? sh + P : 0) });
+      break;
+    }
+    case 'game-side': {
+      const cw = n ? Math.max(200, W * 0.33) : 0;
+      put(tiles, pack({ x: P, y: P, w: cw, h: H - 2 * P }, n, 16 / 9));
+      if (game) R.set(game, { x: P + (cw ? cw + P : 0), y: P, w: W - 2 * P - (cw ? cw + P : 0), h: H - 2 * P });
+      break;
+    }
+    case 'game-full': {
+      if (game) R.set(game, full);
+      const w = Math.min(230, Math.max(120, W * 0.15)), h = w * 0.75;
+      tiles.forEach((el, i) => R.set(el, { x: W - P - w - 14, y: P + 52 + i * (h + 8), w, h }));   // аккуратно у правого края, поверх игры
+      break;
+    }
+    case 'grid': {
+      const items = game ? [game, ...tiles] : tiles;
+      put(items, pack(full, items.length, 16 / 10));
+      break;
+    }
+    case 'm-split': case 'm-full': {
+      const top = tiles.slice(0, Math.ceil(n / 2)), bot = tiles.slice(Math.ceil(n / 2));
+      const big = name === 'm-split';
+      const sh = Math.min(big ? 150 : 84, Math.max(big ? 74 : 56, H * (big ? 0.18 : 0.11)));
+      const topH = name === 'm-full' ? (n ? sh : 0) : (top.length ? sh : 0);
+      if (name === 'm-full') { put(tiles, pack({ x: P, y: P, w: W - 2 * P, h: sh }, n, 4 / 3)); }
+      else { put(top, pack({ x: P, y: P, w: W - 2 * P, h: sh }, top.length, 4 / 3)); put(bot, pack({ x: P, y: H - P - sh, w: W - 2 * P, h: sh }, bot.length, 4 / 3)); }
+      const botH = name === 'm-split' && bot.length ? sh : 0;
+      if (game) R.set(game, { x: P, y: P + (topH ? topH + P : 0), w: W - 2 * P, h: H - 2 * P - (topH ? topH + P : 0) - (botH ? botH + P : 0) });
+      break;
+    }
+  }
+  return R;
+}
+const baseOf = ctx => ({ call: 'grid', game: 'game-center', mgame: 'm-split' })[ctx];
+function applyFree(name) {
+  const g = $('#grid');
+  const entering = !g.classList.contains('free');
+  const before = entering ? new Map([...g.querySelectorAll('.tile')].map(el => [el, el.getBoundingClientRect()])) : null;
+  g.classList.add('free'); g.classList.remove('focus', 'duo');
+  const W = g.clientWidth, H = g.clientHeight;
+  if (!W || !H) return;
+  const tiles = orderedTiles(), game = gameOpen() ? $('#games') : null;
+  const ctx = layoutCtx();
+  const R = presetRects(name === 'custom' ? baseOf(ctx) : name, W, H, tiles, game);
+  if (name === 'custom') {
+    const cm = LY.custom[ctx] || {};
+    for (const el of [...tiles, ...(game ? [game] : [])]) {
+      const c = cm[winKey(el)];
+      if (c) R.set(el, { x: c.x * W, y: c.y * H, w: c.w * W, h: c.h * H, z: c.z });
+    }
+  }
+  for (const [el, r] of R) {
+    const w = Math.max(80, Math.min(r.w, W)), h = Math.max(56, Math.min(r.h, H));
+    const x = Math.min(Math.max(r.x, -w + 60), W - 60), y = Math.min(Math.max(r.y, 0), H - 40);
+    Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+    el.style.zIndex = r.z || (el === game ? 3 : name === 'game-full' || name === 'mgame' ? 4 : 2);
+    if (r.z) zTop = Math.max(zTop, r.z);
+  }
+  if (name === 'game-full') tiles.forEach(t => { if (!t.style.zIndex || +t.style.zIndex < 4) t.style.zIndex = 4; });
+  // плавный переход из обычной сетки
+  if (before) for (const [el, b] of before) {
+    const a = el.getBoundingClientRect();
+    if (!a.width || !b.width) continue;
+    g.classList.add('snapping');
+    el.animate([{ transform: `translate(${b.left - a.left}px,${b.top - a.top}px) scale(${b.width / a.width},${b.height / a.height})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
+  requestAnimationFrame(() => g.classList.remove('snapping'));
+  fitHand();
+}
+function leaveFree() {
+  const g = $('#grid');
+  if (!g.classList.contains('free')) return;
+  g.classList.remove('free');
+  for (const el of g.querySelectorAll('.win')) for (const k of ['left', 'top', 'width', 'height', 'zIndex']) el.style[k] = '';
+  if (pinned) g.classList.add('focus');
+}
+let zTop = 10;
+function bringFront(win) { win.style.zIndex = ++zTop; }
+// Снимок текущих положений как «своя раскладка» — дальше пользователь двигает окна сам
+function ensureCustom() {
+  const ctx = layoutCtx(), g = $('#grid'), W = g.clientWidth, H = g.clientHeight;
+  if (LY[ctx] === 'custom') return;
+  const cm = {};
+  for (const el of g.querySelectorAll('.win')) {
+    if (el.classList.contains('hidden')) continue;
+    cm[winKey(el)] = { x: el.offsetLeft / W, y: el.offsetTop / H, w: el.offsetWidth / W, h: el.offsetHeight / H, z: +el.style.zIndex || 2 };
+  }
+  LY.custom[ctx] = cm; LY[ctx] = 'custom';
+}
+function saveWin(el) {
+  const ctx = layoutCtx(), g = $('#grid'), W = g.clientWidth, H = g.clientHeight;
+  (LY.custom[ctx] ||= {})[winKey(el)] = { x: el.offsetLeft / W, y: el.offsetTop / H, w: el.offsetWidth / W, h: el.offsetHeight / H, z: +el.style.zIndex || 2 };
+  saveLayout();
+}
+let drag = null;
+$('#grid').addEventListener('pointerdown', e => {
+  const g = $('#grid');
+  if (!g.classList.contains('free')) return;
+  const win = e.target.closest('.win'); if (!win) return;
+  const rz = !!e.target.closest('.rz');
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (!rz) {
+    if (win.id === 'games' && !e.target.closest('.chat-h')) { bringFront(win); return; }   // внутри игры — обычные клики
+    if (e.target.closest('button,input,select,a,[data-act]')) return;
+  }
+  bringFront(win);
+  drag = { win, rz, sx: e.clientX, sy: e.clientY, x: win.offsetLeft, y: win.offsetTop, w: win.offsetWidth, h: win.offsetHeight, moved: false };
+  win._dragged = false;
+  try { win.setPointerCapture(e.pointerId); } catch {}
+});
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved) { if (Math.abs(dx) + Math.abs(dy) < 5) return; drag.moved = true; ensureCustom(); drag.win.classList.add('drag'); closeSheets(); }
+  e.preventDefault();
+  const g = $('#grid'), W = g.clientWidth, H = g.clientHeight, s = drag.win.style;
+  if (drag.rz) {
+    s.width = Math.max(110, Math.min(drag.w + dx, W - drag.x)) + 'px';
+    s.height = Math.max(70, Math.min(drag.h + dy, H - drag.y)) + 'px';
+  } else {
+    s.left = Math.min(Math.max(drag.x + dx, -drag.w + 60), W - 60) + 'px';
+    s.top = Math.min(Math.max(drag.y + dy, 0), H - 40) + 'px';
+  }
+  if (drag.win.id === 'games') fitHand();
+}, { passive: false });
+function endDrag() {
+  if (!drag) return;
+  const { win, moved } = drag;
+  drag = null;
+  win.classList.remove('drag');
+  if (moved) { win._dragged = true; setTimeout(() => { win._dragged = false; }, 50); saveWin(win); renderLayoutMenu(); }
+}
+addEventListener('pointerup', endDrag);
+addEventListener('pointercancel', endDrag);
+
+// --- меню раскладок ---
+const pvHTML = boxes => `<span class="pv">${boxes.map(([x, y, w, h, g]) => `<i class="${g ? 'g' : ''}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"></i>`).join('')}</span>`;
+function renderLayoutMenu() {
+  const m = $('#layoutMenu');
+  if (m.classList.contains('hidden')) return;
+  const ctx = layoutCtx();
+  const cur = ctx === 'call' && isNarrow() ? 'auto' : LY[ctx];
+  const title = ctx === 'call' ? 'Звонок' : 'Звонок с игрой';
+  const list = PRESETS[ctx].map(([id, label, pv]) => `<button class="opt ${cur === id ? 'act' : ''}" data-preset="${id}">${pvHTML(pv)}<span>${label}</span></button>`).join('');
+  const hasCustom = Object.keys(LY.custom[ctx] || {}).length;
+  m.innerHTML = `<h4>${title}</h4>${list}
+    ${hasCustom ? `<button class="opt ${cur === 'custom' ? 'act' : ''}" data-preset="custom"><span class="pv" style="display:grid;place-items:center">✋</span><span>Своя раскладка</span></button>` : ''}
+    <div class="hint">${isNarrow() ? 'Окна можно двигать пальцем, угол — изменить размер.' : 'Тяните окна мышкой, за угол — меняйте размер. Можно класть одно на другое.'}</div>
+    ${hasCustom ? '<button class="opt" data-preset="reset"><span>↺ Сбросить своё расположение</span></button>' : ''}`;
+  if (ctx === 'call' && isNarrow()) m.innerHTML = `<h4>Звонок</h4><div class="hint">На телефоне камеры раскладываются автоматически. Откройте игру — появятся раскладки «камеры сверху и снизу» и «игра крупно».</div>`;
+}
+function closeSheets() { $('#layoutMenu').classList.add('hidden'); $('#moreSheet').classList.add('hidden'); }
+$('#bLayout').onclick = e => { e.stopPropagation(); const m = $('#layoutMenu'); const open = m.classList.contains('hidden'); closeSheets(); m.classList.toggle('hidden', !open); renderLayoutMenu(); };
+$('#layoutMenu').addEventListener('click', e => {
+  e.stopPropagation();
+  const b = e.target.closest('[data-preset]'); if (!b) return;
+  const ctx = layoutCtx(), id = b.dataset.preset;
+  if (id === 'reset') { LY.custom[ctx] = {}; if (LY[ctx] === 'custom') LY[ctx] = ctx === 'call' ? 'auto' : baseOf(ctx); }
+  else LY[ctx] = id;
+  saveLayout(); layout(); renderLayoutMenu();
+});
+document.addEventListener('click', e => { if (!e.target.closest('.sheet') && !e.target.closest('#bLayout,#bMore')) closeSheets(); });
+if (window.ResizeObserver) new ResizeObserver(() => { if ($('#grid').classList.contains('free') && !drag) layout(); }).observe($('#grid'));
 addEventListener('resize', layout);
 function applySink(v) { if (S.spk && v.setSinkId) v.setSinkId(S.spk).catch(() => {}); }
 
@@ -734,6 +1061,7 @@ function connect() {
   });
   on('game', d => setGame(d));
   on('game-error', d => toast('🎮 ' + d.message));
+  on('busy', () => { leaving = true; es.close(); alert('Сервер сейчас перегружен, попробуйте через минуту'); location.href = location.pathname; });
   on('full', d => { leaving = true; es.close(); alert(`Комната заполнена (максимум ${d.max})`); location.href = location.pathname; });
   es.onerror = () => reconnect();
 }
@@ -771,7 +1099,7 @@ function addMsg(m, silent) {
   const b = document.createElement('div'); b.className = 'bub'; linkify(b, m.text);
   d.append(who, b); $('#msgs').append(d); $('#msgs').scrollTop = 1e9;
   if (!mine && !silent && $('#chat').classList.contains('hidden')) {
-    unread++; $('#unread').textContent = unread; $('#unread').classList.remove('hidden');
+    unread++; $('#unread').textContent = unread; $('#unread').classList.remove('hidden'); $('#mbadge').classList.remove('hidden');
     toast(`💬 ${m.name}: ${m.text.length > 70 ? m.text.slice(0, 70).trimEnd() + '…' : m.text}`);
   }
 }
@@ -781,7 +1109,7 @@ function toggleChat(force) {
   $('#chat').classList.toggle('hidden', !open);
   $('#bChat').classList.toggle('on', open);
   if (open && isNarrow()) toggleGames(false);
-  if (open) { unread = 0; $('#unread').classList.add('hidden'); $('#chatInput').focus(); }
+  if (open) { unread = 0; $('#unread').classList.add('hidden'); $('#mbadge').classList.add('hidden'); $('#chatInput').focus(); }
   setTimeout(layout, 0);
 }
 $('#chatForm').onsubmit = e => {
@@ -796,9 +1124,9 @@ const isNarrow = () => innerWidth <= 700 || innerHeight <= 500;
 const SUIT = { S: '♠', C: '♣', D: '♦', H: '♥' };
 const RANK = { 11: 'В', 12: 'Д', 13: 'К', 14: 'Т' };
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const cardHTML = (c, cls = '', act = '') => {
+const cardHTML = (c, cls = '', act = '', attrs = '') => {
   const s = c[0], r = +c.slice(1), red = s === 'H' || s === 'D', lab = (RANK[r] || r) + SUIT[s];
-  return `<div class="card ${red ? 'red' : ''} ${cls}" ${act ? `data-act="${act}"` : ''}><span>${lab}</span><span class="c">${SUIT[s]}</span><span class="r2">${lab}</span></div>`;
+  return `<div class="card ${red ? 'red' : ''} ${cls}" ${act ? `data-act="${act}"` : ''} ${attrs}><span>${lab}</span><span class="c">${SUIT[s]}</span><span class="r2">${lab}</span></div>`;
 };
 const gsend = (op, extra = {}) => send('game', { op, ...extra });
 
@@ -808,7 +1136,7 @@ function toggleGames(force) {
   $('#bGames').classList.toggle('on', open);
   document.body.classList.toggle('gopen', open);
   if (open) { $('#toast').innerHTML = ''; $('#gbadge').classList.add('hidden'); if (isNarrow()) toggleChat(false); renderGame(); }
-  setTimeout(layout, 0);
+  layout(); renderLayoutMenu();
 }
 
 function setGame(v, initial) {
@@ -832,7 +1160,69 @@ function scheduleRender() {           // не перерисовываем ча�
   requestAnimationFrame(() => { renderQueued = false; renderGame(); });
 }
 
+// ---------- анимации: FLIP-перелёты карт между рендерами ----------
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(.2,.8,.2,1)';
+let flipExit = null, flipSession = '';
+function flipCapture() {
+  const m = new Map(), b = $('#gameBody');
+  for (const el of b.querySelectorAll('[data-fk],[data-an]')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) continue;
+    if (el.dataset.fk) m.set('k:' + el.dataset.fk, { r, el: el.dataset.exit ? el.cloneNode(true) : null });
+    if (el.dataset.an) m.set('a:' + el.dataset.an, { r });
+  }
+  return m;
+}
+function flipPlay(prev) {
+  const b = $('#gameBody'), seen = new Set();
+  const ctr = r => [r.left + r.width / 2, r.top + r.height / 2];
+  let deal = 0;
+  for (const el of b.querySelectorAll('[data-fk]')) {
+    const k = el.dataset.fk; seen.add(k);
+    const r = el.getBoundingClientRect(); if (!r.width) continue;
+    const p = prev.get('k:' + k);
+    if (p) {                                                   // элемент был — плавно доезжает на новое место
+      const dx = p.r.left - r.left, dy = p.r.top - r.top;
+      if (Math.abs(dx) + Math.abs(dy) > 3) el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }], { duration: 420, easing: EASE });
+      continue;
+    }
+    const from = el.dataset.from, src = from && (prev.get('a:' + from) || prev.get('k:' + from));
+    const delay = from === 'deck' || from === 'tcard' ? 70 * deal++ : 0;
+    if (src) {                                                 // новый — прилетает оттуда, откуда пришёл
+      const [sx, sy] = ctr(src.r), [tx, ty] = ctr(r);
+      el.animate([{ transform: `translate(${sx - tx}px,${sy - ty}px) scale(.5) rotate(-10deg)`, opacity: .3 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: EASE, delay, fill: 'backwards' });
+    } else {
+      el.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 1, offset: .7 }, { transform: 'none', opacity: 1 }], { duration: 360, easing: 'ease-out' });
+    }
+  }
+  // ушедшие со стола карты улетают «призраками»: в бито или к тому, кто взял
+  for (const [k, p] of prev) if (k.startsWith('k:') && p.el && !seen.has(k.slice(2))) ghostFly(p, flipExit);
+  flipExit = null;
+}
+function ghostFly(p, target) {
+  const g = p.el;
+  g.classList.remove('d'); g.removeAttribute('data-fk');
+  Object.assign(g.style, { position: 'fixed', left: p.r.left + 'px', top: p.r.top + 'px', width: p.r.width + 'px', height: p.r.height + 'px', margin: '0', zIndex: 60, pointerEvents: 'none' });
+  g.style.setProperty('--w', p.r.width + 'px');
+  document.body.append(g);
+  const t = target && target !== 'discard' ? $('#gameBody').querySelector(`[data-an="${target}"]`)?.getBoundingClientRect() : null;
+  const [dx, dy] = t && t.width ? [t.left + t.width / 2 - (p.r.left + p.r.width / 2), t.top + t.height / 2 - (p.r.top + p.r.height / 2)] : [240 + Math.random() * 60, -60 - Math.random() * 40];
+  g.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px,${dy}px) scale(.45) rotate(${t ? 0 : 30}deg)`, opacity: 0 }], { duration: 560, easing: 'cubic-bezier(.4,0,.2,1)' }).onfinish = () => g.remove();
+}
 function renderGame() {
+  const g0 = gameView, session = g0 ? `${g0.type}:${g0.status}` : '';
+  const animate = !REDUCE && session === flipSession && !$('#games').classList.contains('hidden') && g0?.status === 'playing';
+  const prev = animate ? flipCapture() : null;
+  flipSession = $('#games').classList.contains('hidden') ? '' : session;
+  renderGameInner();
+  if (prev) flipPlay(prev); else flipExit = null;
+  const st = $('#gameBody').querySelector('.gstatus.my');   // «ваш ход» подсвечиваем только в момент смены хода
+  if (st && !wasMyTurn && !REDUCE) st.classList.add('pulse');
+  wasMyTurn = !!st;
+}
+let wasMyTurn = false;
+function renderGameInner() {
   const body = $('#gameBody');
   clearInterval(gameTimerIv);
   if ($('#games').classList.contains('hidden')) return;
@@ -872,6 +1262,7 @@ function renderGame() {
   }
 }
 
+let durPrev = null;
 function renderDurak(g, body) {
   const s = g.state, L = s.legal, nm = id => esc(s.players.find(p => p.id === id)?.name || '?');
   if (selCard && !(L && L.defend[selCard])) selCard = null;
@@ -882,15 +1273,18 @@ function renderDurak(g, body) {
   else if (!s.table.length && L.attack.length) { mine = true; msg = 'Ваш ход — выберите карту'; }
   else if (L.pass) { mine = true; msg = L.attack.length ? 'Подкиньте или нажмите «' + (s.table.every(t => t.d) ? 'Бито' : 'Пас') + '»' : 'Подкинуть нечего'; }
   else msg = `Ходит ${nm(s.attacker)}, отбивается ${nm(s.defender)}`;
-  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.id === s.attacker ? 'att' : ''} ${p.id === s.defender ? 'def' : ''} ${p.out ? 'out' : ''}">
+  // куда улетают карты со стола: «Бито» — в сторону, «взял» — к взявшему
+  if (durPrev && durPrev.table && !s.table.length) flipExit = /берёт/.test(s.log.at(-1) || '') ? (durPrev.defender === me ? 'hand' : 'opp-' + durPrev.defender) : 'discard';
+  durPrev = { table: s.table.length, defender: s.defender };
+  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.id === s.attacker ? 'att' : ''} ${p.id === s.defender ? 'def' : ''} ${p.out ? 'out' : ''}" data-an="opp-${p.id}">
       <div>${esc(p.name)}</div><div class="cnt">${p.out ? '✅ вышел' : `🂠 ${p.count}`}${p.id === s.defender && !p.out ? ' · 🛡' : p.id === s.attacker && !p.out ? ' · ⚔️' : ''}${s.passed.includes(p.id) ? ' · пас' : ''}</div></div>`).join('');
   const targets = selCard ? L.defend[selCard] : [];
-  const table = s.table.map((t, i) => `<div class="pair ${targets.includes(i) ? 'target' : ''}" ${targets.includes(i) ? `data-act="target:${i}"` : ''}>${cardHTML(t.a)}${t.d ? cardHTML(t.d, 'd') : ''}</div>`).join('');
-  const deck = s.deck ? `<div class="deckbox">${cardHTML(s.trumpCard, 'trumpc')}<div class="card back"></div><div class="n">${s.deck} · козырь ${SUIT[s.trump]}</div></div>`
-    : `<div class="deckbox" title="Козырь">${cardHTML(s.trumpCard)}<div class="n">козырь ${SUIT[s.trump]}</div></div>`;
+  const table = s.table.map((t, i) => `<div class="pair ${targets.includes(i) ? 'target' : ''}" ${targets.includes(i) ? `data-act="target:${i}"` : ''}>${cardHTML(t.a, '', '', `data-fk="c-${t.a}" data-from="opp-${s.attacker}" data-exit="1"`)}${t.d ? cardHTML(t.d, 'd', '', `data-fk="c-${t.d}" data-from="opp-${s.defender}" data-exit="1"`) : ''}</div>`).join('');
+  const deck = s.deck ? `<div class="deckbox" data-an="deck">${cardHTML(s.trumpCard, 'trumpc')}<div class="card back"></div><div class="n">${s.deck} · козырь ${SUIT[s.trump]}</div></div>`
+    : `<div class="deckbox" title="Козырь" data-an="deck">${cardHTML(s.trumpCard)}<div class="n">козырь ${SUIT[s.trump]}</div></div>`;
   const hand = s.hand || [];
   const playable = c => L && (L.attack.includes(c) || L.defend[c]);
-  const handHTML = hand.map(c => cardHTML(c, c === selCard ? 'sel' : playable(c) ? 'ok' : (L && (mine || s.defender === me) ? 'no' : ''), `card:${c}`)).join('');
+  const handHTML = hand.map(c => cardHTML(c, c === selCard ? 'sel' : playable(c) ? 'ok' : (L && (mine || s.defender === me) ? 'no' : ''), `card:${c}`, `data-fk="c-${c}" data-from="deck"`)).join('');
   const acts = [];
   if (L?.take) acts.push(`<button class="gbtn warn" data-act="take">Взять</button>`);
   if (L?.pass) acts.push(`<button class="gbtn sec" data-act="pass">${s.table.every(t => t.d) ? 'Бито' : 'Пас'}</button>`);
@@ -900,14 +1294,15 @@ function renderDurak(g, body) {
     <div class="board">${deck}<div class="tbl">${table || '<span class="glog" style="color:#cfe">Стол пуст</span>'}</div></div>
     <div class="glog">${s.log.map(esc).join(' · ')}</div>
     ${acts.length ? `<div class="gbtns">${acts.join('')}</div>` : ''}
-    ${s.hand ? `<div class="hand" id="hand">${handHTML}</div>` : '<p class="glog">Вы смотрите партию как зритель</p>'}`;
+    ${s.hand ? `<div class="hand" id="hand" data-an="hand">${handHTML}</div>` : '<p class="glog">Вы смотрите партию как зритель</p>'}`;
   fitHand();
 }
 // Подгоняем веер карт по ширине панели, чтобы 6–20 карт помещались без прокрутки
 function fitHand() {
   const h = $('#hand'); if (!h) return;
   const n = h.children.length; if (!n) return;
-  const W = h.clientWidth - 8, w = Math.min(64, Math.max(44, W / 6.2));
+  const gh = $('#games').clientHeight || 800;
+  const W = h.clientWidth - 8, w = Math.min(gh < 560 ? 46 : 64, Math.max(gh < 560 ? 36 : 44, W / 6.2));
   h.style.setProperty('--w', w + 'px');
   const ov = n > 1 ? Math.min(6, (W - n * w) / (n - 1)) : 0;
   h.style.setProperty('--ov', Math.max(-w * 0.72, ov) + 'px');
@@ -923,7 +1318,7 @@ function renderTTT(g, body) {
   else msg = `Ходит ${esc(pl(s.turn)?.name)}`;
   const cells = s.board.map((v, i) => {
     const can = L && L.place.includes(i);
-    return `<button class="${v || ''} ${can ? 'can' : ''} ${s.line?.includes(i) ? 'win' : ''}" ${can ? `data-act="cell:${i}"` : 'disabled'}>${v === 'X' ? '✕' : v === 'O' ? '◯' : ''}</button>`;
+    return `<button class="${v || ''} ${can ? 'can' : ''} ${s.line?.includes(i) ? 'win' : ''}" ${can ? `data-act="cell:${i}"` : 'disabled'}>${v ? `<span data-fk="m-${i}" style="display:inline-block">${v === 'X' ? '✕' : '◯'}</span>` : ''}</button>`;
   }).join('');
   body.innerHTML = `<div class="gstatus ${mine ? 'my' : ''}"><span>${msg}</span>${!s.over ? `<span class="tm" data-dl></span>` : ''}</div>
     <div class="opps">${s.players.map(p => `<div class="opp ${p.id === s.turn && !s.over ? 'att' : ''}">${esc(p.name)}${p.id === me ? ' (вы)' : ''}<div class="cnt">${p.mark === 'X' ? '✕' : '◯'}</div></div>`).join('')}</div>
@@ -957,7 +1352,7 @@ function renderSpy(g, body) {
 
   let accHTML = '';
   if (acc && !s.over) {
-    accHTML = `<div class="acc"><div><b>${nm(acc.by)}</b> обвиняет <b>${nm(acc.target)}</b>. ${acc.target === me ? 'Вас обвиняют — ждём голосования…' : 'Это шпион?'}</div>
+    accHTML = `<div class="acc" data-fk="acc-${acc.target}"><div><b>${nm(acc.by)}</b> обвиняет <b>${nm(acc.target)}</b>. ${acc.target === me ? 'Вас обвиняют — ждём голосования…' : 'Это шпион?'}</div>
       <div class="glog" style="text-align:left">Нужно единогласно: ${acc.yes}/${acc.need} «за». Одно «против» — обвинение снимается.</div>
       ${L?.vote ? `<div class="gbtns"><button class="gbtn" data-act="spyvote:1">Да, шпион</button><button class="gbtn sec" data-act="spyvote:0">Нет</button></div>` : ''}</div>`;
   }
@@ -1013,9 +1408,9 @@ function spyClick(act, arg) {
 
 // ---------- Бар лжецов ----------
 const LF = { K: ['К', '♚', 'Король', 'Короли'], Q: ['Д', '♛', 'Дама', 'Дамы'], A: ['Т', '★', 'Туз', 'Тузы'], J: ['Дж', '🃏', 'Джокер'], D: ['☠', '😈', 'Дьявол'] };
-const lcard = (c, cls = '', act = '') => `<div class="card ${c} ${cls}" ${act ? `data-act="${act}"` : ''}><span>${LF[c][0]}</span><span class="c">${LF[c][1]}</span><span class="r2">${LF[c][0]}</span></div>`;
+const lcard = (c, cls = '', act = '', attrs = '') => `<div class="card ${c} ${cls}" ${act ? `data-act="${act}"` : ''} ${attrs}><span>${LF[c][0]}</span><span class="c">${LF[c][1]}</span><span class="r2">${LF[c][0]}</span></div>`;
 const gun = shots => `<span class="gun" title="Выстрелов: ${shots} из 6">${Array.from({ length: 6 }, (_, k) => `<i class="${k < shots ? 'f' : ''}"></i>`).join('')}</span>`;
-let liarPick = [], liarKey = '', liarRevealTimer = null;
+let liarPick = [], liarKey = '', liarRevealTimer = null, liarLastPlayed = [], liarRevealSeen = 0, liarBangSeen = 0;
 const SPIN_MS = 1600;   // пауза «барабан крутится», прежде чем показать результат выстрела
 function renderLiar(g, body) {
   const s = g.state, L = s.legal, nm = id => esc(s.players.find(p => p.id === id)?.name || '?');
@@ -1031,7 +1426,7 @@ function renderLiar(g, body) {
   else if (L) { mine = true; msg = L.forced ? 'Карты остались только у вас — проверяйте!' : s.last ? 'Ваш ход: положите карты или крикните «Лжец!»' : 'Ваш ход: положите 1–3 карты'; }
   else msg = `Ходит ${nm(s.turn)}`;
 
-  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.alive ? '' : 'dead'} ${p.id === s.turn && s.phase === 'play' && !s.over ? 'turn' : ''}">
+  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.alive ? '' : 'dead'} ${p.id === s.turn && s.phase === 'play' && !s.over ? 'turn' : ''}" data-an="opp-${p.id}">
     <div>${esc(p.name)}</div><div class="cnt">${p.alive ? `🂠 ${p.count} · ${gun(p.shots)}` : '💀'}</div></div>`).join('');
 
   let center;
@@ -1042,16 +1437,32 @@ function renderLiar(g, body) {
     const shots = r.shots.map(x => spinning
       ? `<div class="shot spin">🔫 ${nm(x.id)} крутит барабан… (шанс 1 из ${x.chance})</div>`
       : `<div class="shot">${x.died ? `💥 БАХ! ${nm(x.id)} выбывает` : `😮‍💨 Щёлк… ${nm(x.id)} повезло`}</div>`).join('');
-    center = `<div class="rev"><div class="claim">Карта стола — ${tableName}. ${nm(r.by)} выложил(а):</div><div class="pile">${r.cards.map(c => lcard(c)).join('')}</div>${verdict}${shots}</div>`;
+    const fresh = liarRevealSeen !== r.at;              // переворачиваем карты только при первом показе
+    liarRevealSeen = r.at;
+    center = `<div class="rev"><div class="claim">Карта стола — ${tableName}. ${nm(r.by)} выложил(а):</div><div class="pile">${r.cards.map((c, i) => lcard(c, fresh ? 'flipin' : '', '', fresh ? `style="animation-delay:${i * 140}ms"` : '')).join('')}</div>${verdict}${shots}</div>`;
+    if (!spinning && liarBangSeen !== r.at) {            // выстрел: вспышка и тряска окна
+      liarBangSeen = r.at;
+      const died = r.shots.some(x => x.died), win = $('#games');
+      win.classList.remove('bang', 'phew'); void win.offsetWidth;
+      win.classList.add(died ? 'bang' : 'phew');
+      setTimeout(() => win.classList.remove('bang', 'phew'), 900);
+    }
     if (spinning) { clearTimeout(liarRevealTimer); liarRevealTimer = setTimeout(scheduleRender, SPIN_MS - (Date.now() - r.at) + 30); }
   } else {
-    const backs = n => `<div class="stack">${Array.from({ length: Math.min(n, 8) }, () => '<div class="card back"></div>').join('')}</div>`;
+    // рубашки в стопке: новые прилетают из руки положившего (своей — с мест выбранных карт)
+    const shown = Math.min(s.pile, 8), fresh = s.last ? Math.min(s.last.count, shown) : 0;
+    const backs = () => `<div class="stack">${Array.from({ length: shown }, (_, i) => {
+      const j = i - (shown - fresh);
+      const from = j >= 0 ? (s.last.by === me && liarLastPlayed[j] != null ? `lh-${liarLastPlayed[j]}` : `opp-${s.last.by}`) : '';
+      return `<div class="card back" data-fk="p${s.round}-${s.pile - shown + i}" ${from ? `data-from="${from}"` : ''}></div>`;
+    }).join('')}</div>`;
     center = s.last
       ? `<div class="pile">${backs(s.pile)}</div><div class="claim">${nm(s.last.by)}: «${s.last.count} × ${LF[s.table][2]}» · в стопке ${s.pile}</div>`
       : `<div class="claim">Стол пуст — ${nm(s.turn)} начинает</div>`;
   }
   const hand = s.hand || [];
-  const handHTML = hand.map((c, k) => lcard(c, `${liarPick.includes(k) ? 'pickd' : ''} ${c === s.table || c === 'J' ? 'match' : ''}`, L?.play ? `lpick:${k}` : '')).join('');
+  const occ = {};
+  const handHTML = hand.map((c, k) => { occ[c] = (occ[c] || 0) + 1; return lcard(c, `${liarPick.includes(k) ? 'pickd' : ''} ${c === s.table || c === 'J' ? 'match' : ''}`, L?.play ? `lpick:${k}` : '', `data-fk="l${s.round}-${c}${occ[c]}" data-an="lh-${k}" data-from="tcard"`); }).join('');
   const acts = [];
   if (L?.play) acts.push(`<button class="gbtn" data-act="lplay" ${liarPick.length ? '' : 'disabled'}>${liarPick.length ? `Положить ${liarPick.length} как «${LF[s.table][3].toLowerCase()}»` : 'Выберите 1–3 карты'}</button>`);
   if (L?.call) acts.push(`<button class="gbtn liar" data-act="lcall">Лжец!</button>`);
@@ -1061,7 +1472,7 @@ function renderLiar(g, body) {
     ${winner}
     <div class="opps">${opp}</div>
     <div class="lbar">
-      <div class="tcard">Карта стола: ${lcard(s.table)} ${tableName}</div>
+      <div class="tcard">Карта стола: ${lcard(s.table, '', '', 'data-an="tcard"')} ${tableName}</div>
       ${center}
     </div>
     ${meP && meP.alive && s.hand ? `<div class="hand lh" id="hand">${handHTML}</div>` : ''}
@@ -1078,7 +1489,7 @@ function liarClick(act, arg) {
     if (i >= 0) liarPick.splice(i, 1); else if (liarPick.length < 3) liarPick.push(k); else toast('Не больше 3 карт');
     scheduleRender(); return;
   }
-  if (act === 'lplay' && liarPick.length) { gsend('move', { move: { t: 'play', cards: [...liarPick] } }); liarPick = []; return; }
+  if (act === 'lplay' && liarPick.length) { liarLastPlayed = [...liarPick]; gsend('move', { move: { t: 'play', cards: [...liarPick] } }); liarPick = []; return; }
   if (act === 'lcall') gsend('move', { move: { t: 'call' } });
 }
 
@@ -1113,6 +1524,26 @@ $('#gameBody').addEventListener('click', e => {
 });
 $('#gameBody').addEventListener('toggle', e => { if (e.target.matches('details.lc')) spyLocOpen = e.target.open; }, true);
 $('#bGames').onclick = () => toggleGames();
+// «Ещё» на телефоне: второстепенные кнопки спрятаны в меню
+$('#bMore').onclick = e => {
+  e.stopPropagation();
+  const m = $('#moreSheet'), open = m.classList.contains('hidden');
+  closeSheets();
+  if (!open) return;
+  const items = [['bScreen', IC.screen, screen ? 'Остановить показ' : 'Показать экран'], ['bHand', '✋', hand ? 'Опустить руку' : 'Поднять руку'],
+    ['bChat', IC.chat, 'Чат'], ['layout', '▦', 'Раскладка'], ['bSet', IC.gear, 'Настройки'], ['copy', '🔗', 'Ссылка']];
+  m.innerHTML = items.filter(([id]) => id !== 'bScreen' || navigator.mediaDevices?.getDisplayMedia)
+    .map(([id, ic, label]) => `<button data-more="${id}">${ic}<span>${label}</span>${id === 'bChat' && unread ? `<span class="badge">${unread}</span>` : ''}</button>`).join('');
+  m.classList.remove('hidden');
+};
+$('#moreSheet').addEventListener('click', e => {
+  const b = e.target.closest('[data-more]'); if (!b) return;
+  e.stopPropagation();
+  const id = b.dataset.more;
+  closeSheets();
+  if (id === 'layout') { $('#bLayout').click(); return; }
+  $('#' + id).click();
+});
 $('#gamesClose').onclick = () => toggleGames(false);
 
 // ---------- вход/выход ----------

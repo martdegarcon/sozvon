@@ -32,7 +32,7 @@ function connect(port, room, name, extra = '') {
           const e = { ev, data: JSON.parse(data), t: performance.now(), used: false };
           c.events.push(e);
           if (ev === 'hello') { c.id = e.data.id; c.token = e.data.token; resolve(c); }
-          if (ev === 'full') resolve(c);
+          if (ev === 'full' || ev === 'busy') resolve(c);
           for (const w of [...c.waiters]) if (!e.used && w.pred(e)) { e.used = true; c.waiters.splice(c.waiters.indexOf(w), 1); w.resolve(e); }
         }
       });
@@ -272,5 +272,68 @@ test('пустая комната удаляется, память не течё
     for (let i = 0; i < 30; i++) { const c = await connect(s.port, 'tmp' + i, 'X'); c.req.destroy(); }
     await sleep(400);
     assert.equal(s.srv.rooms.size, 0);
+  } finally { await s.close(); }
+});
+
+test('пустая комната удаляется через TTL вместе с игрой и историей; занятая — нет', async () => {
+  const s = await startServer({ roomTtlMs: 300, graceMs: 50 });
+  try {
+    const a = await connect(s.port, 'ttl', 'A');
+    await send(s.port, a, [{ type: 'chat', data: { text: 'привет' } }, { type: 'game', data: { op: 'create', game: 'ttt' } }]);
+    await wait(a, 'game');
+    const keep = await connect(s.port, 'busy-room', 'B');
+    a.req.destroy();
+    await sleep(150);
+    assert.ok(s.srv.rooms.has('ttl'), 'сразу не удаляем — вдруг человек вернётся');
+    const health = await (await fetch(`http://127.0.0.1:${s.port}/health`)).json();
+    assert.equal(health.ok, true);
+    await sleep(400);
+    assert.ok(!s.srv.rooms.has('ttl'), 'через TTL удалена');
+    assert.ok(s.srv.rooms.has('busy-room'), 'комната с людьми живёт');
+    const back = await connect(s.port, 'ttl', 'A');
+    assert.deepEqual(back.events[0].data.history, [], 'история не воскресла');
+    assert.equal(back.events[0].data.game, null);
+    keep.req.destroy(); back.req.destroy();
+  } finally { await s.close(); }
+});
+
+test('вернулся до истечения TTL — комната и история на месте', async () => {
+  const s = await startServer({ roomTtlMs: 500 });
+  try {
+    const a = await connect(s.port, 'stay', 'A');
+    await send(s.port, a, [{ type: 'chat', data: { text: 'я тут' } }]);
+    await wait(a, 'chat');
+    a.req.destroy();
+    await sleep(200);
+    const b = await connect(s.port, 'stay', 'B');
+    assert.deepEqual(b.events[0].data.history.map(m => m.text), ['я тут']);
+    await sleep(500);
+    assert.ok(s.srv.rooms.has('stay'), 'пока внутри есть человек — не удаляется');
+  } finally { await s.close(); }
+});
+
+test('лимит числа комнат: лишние не создаются, сервер жив', async () => {
+  const s = await startServer({ maxRooms: 5 });
+  try {
+    const cs = [];
+    for (let i = 0; i < 5; i++) cs.push(await connect(s.port, 'lim' + i, 'X'));
+    const extra = await connect(s.port, 'lim-extra', 'X');
+    assert.ok(extra.events.some(e => e.ev === 'busy'));
+    assert.equal(s.srv.rooms.size, 5);
+    const again = await connect(s.port, 'lim0', 'Y');
+    assert.ok(again.id, 'в существующую комнату войти можно');
+  } finally { await s.close(); }
+});
+
+test('фоновая уборка подчищает комнаты, даже если таймер не сработал', async () => {
+  const s = await startServer({ roomTtlMs: 200, sweepMs: 100 });
+  try {
+    const a = await connect(s.port, 'sweep', 'A');
+    a.req.destroy();
+    await sleep(80);
+    const room = s.srv.rooms.get('sweep');
+    clearTimeout(room.timer);            // имитируем «потерянный» таймер
+    await sleep(400);
+    assert.ok(!s.srv.rooms.has('sweep'));
   } finally { await s.close(); }
 });
