@@ -106,12 +106,15 @@ main{flex:1;display:flex;min-height:0}
 footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);flex-wrap:wrap}
 @media(max-width:700px),(max-height:500px){
   footer{gap:6px;padding:10px 8px;padding-bottom:max(10px,env(safe-area-inset-bottom));flex-wrap:nowrap}
-  footer .ctl{width:clamp(38px,11vw,46px);height:clamp(38px,11vw,46px)}
-  footer .ctl.leave{width:clamp(46px,14vw,60px)}
+  footer{gap:5px}
+  footer .ctl{width:clamp(34px,10.2vw,46px);height:clamp(34px,10.2vw,46px)}
+  footer .ctl.leave{width:clamp(42px,12.5vw,60px)}
+  footer .ctl .badge{top:-2px;right:-2px}
   footer .ctl svg{width:20px;height:20px}
   .ctl[data-tip]:hover::after{display:none}
   #call header{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));gap:8px}
   #copy .long{display:none}#copy .short{display:inline}
+  #toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}
 }
 .ctl{position:relative;width:52px;height:52px;border-radius:50%;border:0;background:var(--panel2);display:grid;place-items:center;cursor:pointer;transition:background .15s}
 .ctl:hover{background:#2b303b}
@@ -120,6 +123,62 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
 .ctl.leave{background:var(--red);color:#fff;width:68px;border-radius:26px}
 .ctl .badge{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px}
 .ctl[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:60px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#000;padding:4px 8px;border-radius:6px;font-size:12px;pointer-events:none}
+
+
+/* --- игры --- */
+#games{width:440px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel);min-height:0}
+@media(max-width:700px),(max-height:500px){#games{position:fixed;inset:0;bottom:var(--fh,70px);width:auto;z-index:6;padding-top:env(safe-area-inset-top)}}
+#gameBody{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+.gl{display:grid;gap:10px}
+.gcard{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;text-align:left;width:100%}
+.gcard:hover{border-color:var(--acc)}
+.gcard .ico{font-size:30px;width:44px;text-align:center}
+.gcard b{display:block}.gcard small{color:var(--mute)}
+.gbtns{display:flex;gap:8px;flex-wrap:wrap}
+.gbtn{flex:1;min-width:110px;padding:11px 12px;border-radius:10px;border:0;background:var(--acc);color:#fff;font-weight:600;cursor:pointer}
+.gbtn.sec{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+.gbtn.warn{background:#e0892a}
+.gbtn:disabled{opacity:.45;cursor:default}
+.plist{display:flex;flex-direction:column;gap:6px}
+.plist div{background:var(--panel2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between}
+.gstatus{background:var(--panel2);border-radius:10px;padding:10px 12px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.gstatus.my{background:#24345e;border:1px solid var(--acc)}
+.gstatus .tm{font-variant-numeric:tabular-nums;color:var(--mute);font-weight:500;white-space:nowrap}
+.gstatus .tm.low{color:#ff8a8a}
+.opps{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.opp{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;text-align:center;min-width:76px}
+.opp.att{border-color:#e0892a}.opp.def{border-color:var(--acc)}.opp.out{opacity:.5}
+.opp .cnt{font-size:12px;color:var(--mute)}
+.board{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:120px;background:#13401f;border-radius:14px;padding:12px;--w:46px}
+.deckbox{position:relative;width:calc(var(--w) + 26px);height:calc(var(--w)*1.4);flex:none}
+.deckbox .card{position:absolute}
+.deckbox .trumpc{left:24px;top:8px;transform:rotate(90deg)}
+.deckbox .n{position:absolute;left:0;bottom:-18px;font-size:12px;color:#cfe;white-space:nowrap}
+.board{padding-bottom:26px}
+.tbl{display:flex;flex-wrap:wrap;gap:10px 22px;justify-content:center;flex:1;min-width:0}
+.pair{position:relative;width:calc(var(--w) + 14px);height:calc(var(--w)*1.4 + 14px);flex:none}
+.pair .d{position:absolute;left:14px;top:14px;transform:rotate(6deg)}
+.pair.target .card:first-child{outline:3px dashed #ffd84d;cursor:pointer;animation:pulse 1s infinite}
+@keyframes pulse{50%{outline-color:transparent}}
+.card{--w:52px;width:var(--w);height:calc(var(--w)*1.4);border-radius:7px;background:#fff;color:#16181d;display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;font:700 calc(var(--w)*.3)/1 system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.35);user-select:none;-webkit-user-select:none;flex:none;transition:transform .12s;touch-action:manipulation}
+.board .card{--w:inherit}
+.card.red{color:#d42a2a}
+.card .c{align-self:center;font-size:calc(var(--w)*.5)}
+.card .r2{align-self:flex-end;transform:rotate(180deg)}
+.card.back{background:repeating-linear-gradient(45deg,#3d55c9 0 5px,#2f43a8 5px 10px);border:2px solid #fff}
+.hand{display:flex;justify-content:center;padding:16px 4px 4px;--w:56px;min-height:100px}
+.hand .card{--w:inherit;cursor:default;position:relative}
+.hand .card+.card{margin-left:var(--ov,4px)}
+.hand .card.ok{cursor:pointer;box-shadow:0 0 0 3px var(--green),0 2px 6px rgba(0,0,0,.35);transform:translateY(-8px)}
+.hand .card.sel{box-shadow:0 0 0 3px #ffd84d,0 2px 6px rgba(0,0,0,.35);transform:translateY(-16px)}
+.hand .card.no{filter:brightness(.6)}
+.glog{font-size:12px;color:var(--mute);text-align:center;min-height:1em}
+.ttt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(100%,320px);margin:0 auto}
+.ttt button{aspect-ratio:1;border-radius:12px;border:0;background:var(--panel2);font:700 46px/1 system-ui;color:var(--text);cursor:pointer}
+.ttt button.X{color:#5b8cff}.ttt button.O{color:#ff9f43}
+.ttt button.win{background:#1f4d33}
+.ttt button:disabled{cursor:default}
+.ttt button.can:hover{background:#2b303b}
 
 /* --- settings --- */
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
@@ -188,6 +247,10 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
       <div id="msgs"></div>
       <form id="chatForm"><input id="chatInput" placeholder="Сообщение…" autocomplete="off" maxlength="4000"><button aria-label="Отправить">➤</button></form>
     </aside>
+    <aside id="games" class="hidden">
+      <div class="chat-h"><span id="gamesTitle">Игры</span> <button id="gamesClose" aria-label="Закрыть">×</button></div>
+      <div id="gameBody"></div>
+    </aside>
   </main>
   <footer>
     <button class="ctl" id="bMic" data-tip="Микрофон (M)"></button>
@@ -195,6 +258,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <button class="ctl" id="bScreen" data-tip="Демонстрация экрана"></button>
     <button class="ctl" id="bHand" data-tip="Поднять руку">✋</button>
     <button class="ctl" id="bChat" data-tip="Чат"><span class="badge hidden" id="unread">0</span></button>
+    <button class="ctl" id="bGames" data-tip="Игры"><span class="badge hidden" id="gbadge">!</span></button>
     <button class="ctl" id="bSet" data-tip="Настройки"></button>
     <button class="ctl leave" id="bLeave" data-tip="Выйти"></button>
   </footer>
@@ -241,6 +305,7 @@ const IC = {
   chat:'<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-6.2A8 8 0 1 1 21 12z"/></svg>',
   gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   leave:'<svg viewBox="0 0 24 24"><path d="M3 15c5-4.5 13-4.5 18 0l-2.5 2.5-3-1.5v-2.5a12 12 0 0 0-7 0V16l-3 1.5z" fill="currentColor"/></svg>',
+  game:'<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7 10.5v4M5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="17.5" cy="13.8" r=".9" fill="currentColor"/></svg>',
   full:'<svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>',
 };
 
@@ -377,7 +442,7 @@ function attachLocal(p) {
   }
 }
 function refreshOutgoing() {
-  peers.forEach(attachLocal);
+  peers.forEach(attachLocal); tuneSenders();
   renderSelf(); renderButtons(); sendState();
 }
 function renderSelf() {
@@ -506,6 +571,7 @@ function createPeer(id, name, state, initiator) {
     const s = pc.connectionState;
     tile.el.querySelector('.st').textContent = s === 'connected' ? '' : s === 'failed' ? 'Нет связи — переподключаю…' : s === 'disconnected' ? 'Связь прервалась…' : 'Подключение…';
     if (s === 'failed') pc.restartIce();
+    if (s === 'connected') tuneSenders();
   };
   if (initiator) {
     pc.addTransceiver('audio', { direction: 'sendrecv' });
@@ -547,47 +613,101 @@ function removePeer(id) {
   const p = peers.get(id); if (!p) return;
   p.pc.close(); removeMeter(id);
   if (pinned === p.tile.el) pin(null);
-  p.tile.el.remove(); peers.delete(id); layout();
+  p.tile.el.remove(); peers.delete(id); layout(); tuneSenders();
 }
 
 // ---------- сигнализация ----------
-async function send(type, data, to) {
+// Все исходящие сообщения идут через одну очередь: порядок сохраняется (ICE-кандидаты не обгоняют offer),
+// а накопившиеся отправляются одной пачкой — меньше запросов и задержек.
+const outbox = [];
+let flushing = false, resume = null, lastSeen = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function send(type, data, to) {
   if (!token) return;
-  try { await fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, type, data, to }) }); }
-  catch { }
+  outbox.push({ type, data, to });
+  if (!flushing) flush();
+}
+async function flush() {
+  flushing = true;
+  let fails = 0;
+  while (outbox.length && token) {
+    const batch = outbox.slice(0, 100), tok = token;
+    try {
+      const r = await fetch('/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tok, batch }) });
+      if (r.status === 429) { await sleep(400); continue; }
+      outbox.splice(0, batch.length); fails = 0;
+    } catch {
+      if (++fails > 4 || tok !== token) { outbox.length = 0; break; }
+      await sleep(300 * fails);
+    }
+  }
+  flushing = false;
 }
 function sendState() { if (inCall) send('state', { mic: micOn && !!local.audio, cam: camOn && !!local.video, screen: !!screen, hand }); }
 
+// Чем больше людей — тем ниже битрейт на каждого: в mesh-схеме это главное средство от лагов
+function tuneSenders() {
+  const n = peers.size;
+  const kbps = screen ? (n <= 1 ? 2500 : n <= 3 ? 1500 : 900) : (n <= 1 ? 1500 : n <= 3 ? 900 : n <= 5 ? 550 : 400);
+  const scale = !screen && n >= 4 ? 1.5 : 1;
+  peers.forEach(p => {
+    for (const t of p.pc.getTransceivers()) {
+      if (t.receiver.track.kind !== 'video' || t.currentDirection === 'stopped') continue;
+      const prm = t.sender.getParameters();
+      if (!prm.encodings || !prm.encodings.length) continue;
+      const e = prm.encodings[0];
+      if (e.maxBitrate === kbps * 1000 && (e.scaleResolutionDownBy || 1) === scale) continue;
+      e.maxBitrate = kbps * 1000; e.scaleResolutionDownBy = scale;
+      t.sender.setParameters(prm).catch(() => {});
+    }
+  });
+}
+
 function connect() {
   const name = S.name || 'Гость';
-  es = new EventSource(`/events?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(name)}`);
-  es.addEventListener('hello', e => {
-    const d = JSON.parse(e.data);
-    me = d.id; token = d.token; iceServers = d.iceServers;
+  const rq = resume ? `&rid=${encodeURIComponent(resume.rid)}&rkey=${encodeURIComponent(resume.rkey)}` : '';
+  es = new EventSource(`/events?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(name)}${rq}`);
+  lastSeen = Date.now();
+  const on = (ev, fn) => es.addEventListener(ev, e => { lastSeen = Date.now(); try { fn(e.data ? JSON.parse(e.data) : null); } catch (err) { console.error(ev, err); } });
+  on('hello', d => {
+    me = d.id; token = d.token; iceServers = d.iceServers; resume = null;
     $('#msgs').innerHTML = ''; d.history.forEach(m => addMsg(m, true));
     d.peers.forEach(p => createPeer(p.id, p.name, p.state, true));
+    setGame(d.game, true);
     sendState();
   });
-  es.addEventListener('join', e => { const d = JSON.parse(e.data); createPeer(d.id, d.name, d.state, false); sysMsg(`${d.name} подключился(-ась)`); });
-  es.addEventListener('leave', e => { const d = JSON.parse(e.data); const p = peers.get(d.id); if (p) sysMsg(`${p.name} вышел(-ла)`); removePeer(d.id); });
-  es.addEventListener('signal', e => onSignal(JSON.parse(e.data)));
-  es.addEventListener('chat', e => addMsg(JSON.parse(e.data)));
-  es.addEventListener('state', e => {
-    const d = JSON.parse(e.data), p = peers.get(d.id); if (!p) return;
+  on('ping', () => {});
+  on('join', d => { createPeer(d.id, d.name, d.state, false); sysMsg(`${d.name} подключился(-ась)`); });
+  on('leave', d => { const p = peers.get(d.id); if (p) sysMsg(`${p.name} вышел(-ла)`); removePeer(d.id); });
+  on('signal', d => onSignal(d));
+  on('chat', d => addMsg(d));
+  on('state', d => {
+    const p = peers.get(d.id); if (!p) return;
     if (d.state.hand && !p.state.hand) toast(`${p.name} поднимает руку ✋`);
     if (d.state.screen && !p.state.screen) { toast(`${p.name} показывает экран`); pin(p.tile.el); }
     if (!d.state.screen && p.state.screen && pinned === p.tile.el) pin(null);
     p.state = d.state; applyState(p);
   });
-  es.addEventListener('full', e => { leaving = true; es.close(); alert(`Комната заполнена (максимум ${JSON.parse(e.data).max})`); location.href = location.pathname; });
-  es.onerror = () => {
-    if (leaving) return;
-    es.close(); token = null;
-    [...peers.keys()].forEach(removePeer);
-    toast('Связь с сервером потеряна, переподключаюсь…');
-    setTimeout(() => inCall && connect(), 2500);
-  };
+  on('game', d => setGame(d));
+  on('game-error', d => toast('🎮 ' + d.message));
+  on('full', d => { leaving = true; es.close(); alert(`Комната заполнена (максимум ${d.max})`); location.href = location.pathname; });
+  es.onerror = () => reconnect();
 }
+function reconnect() {
+  if (leaving || !inCall) return;
+  es?.close();
+  if (me && token) resume = { rid: me, rkey: token };   // вернёмся тем же участником — место в игре сохранится
+  token = null; outbox.length = 0;
+  [...peers.keys()].forEach(removePeer);
+  toast('Связь с сервером потеряна, переподключаюсь…');
+  clearTimeout(reconnect.t);
+  reconnect.t = setTimeout(() => inCall && connect(), 1500);
+}
+// Сторож: если сервер молчит дольше 40 с (пульс раз в 15 с) — соединение «зависло», переподключаемся
+setInterval(() => { if (inCall && token && Date.now() - lastSeen > 40000) reconnect(); }, 5000);
+// Вернулись на вкладку/разблокировали телефон — сразу проверяем связь
+document.addEventListener('visibilitychange', () => { if (!document.hidden && inCall && token && Date.now() - lastSeen > 20000) reconnect(); });
+addEventListener('online', () => { if (inCall && Date.now() - lastSeen > 5000) reconnect(); });
 
 // ---------- чат ----------
 function linkify(el, text) {
@@ -616,6 +736,7 @@ function toggleChat(force) {
   const open = force ?? $('#chat').classList.contains('hidden');
   $('#chat').classList.toggle('hidden', !open);
   $('#bChat').classList.toggle('on', open);
+  if (open && isNarrow()) toggleGames(false);
   if (open) { unread = 0; $('#unread').classList.add('hidden'); $('#chatInput').focus(); }
   setTimeout(layout, 0);
 }
@@ -623,6 +744,168 @@ $('#chatForm').onsubmit = e => {
   e.preventDefault(); const t = $('#chatInput').value.trim(); if (!t) return;
   send('chat', { text: t }); $('#chatInput').value = '';
 };
+
+
+// ---------- игры ----------
+let gameView = null, selCard = null, gameTimerIv = null;
+const isNarrow = () => innerWidth <= 700 || innerHeight <= 500;
+const SUIT = { S: '♠', C: '♣', D: '♦', H: '♥' };
+const RANK = { 11: 'В', 12: 'Д', 13: 'К', 14: 'Т' };
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const cardHTML = (c, cls = '', act = '') => {
+  const s = c[0], r = +c.slice(1), red = s === 'H' || s === 'D', lab = (RANK[r] || r) + SUIT[s];
+  return `<div class="card ${red ? 'red' : ''} ${cls}" ${act ? `data-act="${act}"` : ''}><span>${lab}</span><span class="c">${SUIT[s]}</span><span class="r2">${lab}</span></div>`;
+};
+const gsend = (op, extra = {}) => send('game', { op, ...extra });
+
+function toggleGames(force) {
+  const open = force ?? $('#games').classList.contains('hidden');
+  $('#games').classList.toggle('hidden', !open);
+  $('#bGames').classList.toggle('on', open);
+  if (open) { $('#gbadge').classList.add('hidden'); if (isNarrow()) toggleChat(false); renderGame(); }
+  setTimeout(layout, 0);
+}
+
+function setGame(v, initial) {
+  const prev = gameView;
+  gameView = v;
+  if (!v) { selCard = null; }
+  const closed = $('#games').classList.contains('hidden');
+  if (v && !initial && closed) {
+    const host = v.players.find(p => p.id === v.host);
+    if ((!prev || prev.type !== v.type || prev.status === 'over') && v.status === 'lobby' && v.host !== me) toast(`🎮 ${host ? host.name : 'Кто-то'} зовёт играть: ${v.title}`);
+    if (v.status === 'playing' && prev?.status !== 'playing' && v.players.some(p => p.id === me)) { toggleGames(true); return; }
+    $('#gbadge').classList.remove('hidden');
+  }
+  if (!v && prev && prev.status !== 'over') toast('🎮 Игра закрыта');
+  scheduleRender();
+}
+let renderQueued = false;
+function scheduleRender() {           // не перерисовываем чаще одного раза за кадр
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; renderGame(); });
+}
+
+function renderGame() {
+  const body = $('#gameBody');
+  clearInterval(gameTimerIv);
+  if ($('#games').classList.contains('hidden')) return;
+  const g = gameView;
+  $('#gamesTitle').textContent = g ? g.title : 'Игры';
+  if (!g) {
+    body.innerHTML = `<div class="gl">
+      <button class="gcard" data-act="create:durak"><span class="ico">🃏</span><span><b>Дурак</b><small>Подкидной, 36 карт · 2–6 игроков</small></span></button>
+      <button class="gcard" data-act="create:ttt"><span class="ico">⭕</span><span><b>Крестики-нолики</b><small>3×3 · 2 игрока</small></span></button>
+    </div><p class="glog">Выберите игру — остальные участники звонка получат приглашение.</p>`;
+    return;
+  }
+  const inGame = g.players.some(p => p.id === me), isHost = g.host === me;
+  if (g.status === 'lobby') {
+    body.innerHTML = `<div class="gstatus">Ждём игроков <span class="tm">${g.players.length}/${g.max}</span></div>
+      <div class="plist">${g.players.map(p => `<div><span>${esc(p.name)}${p.id === me ? ' (вы)' : ''}</span><span>${p.id === g.host ? '👑' : ''}</span></div>`).join('')}</div>
+      <div class="gbtns">
+        ${inGame ? `<button class="gbtn sec" data-act="leave">Выйти</button>` : `<button class="gbtn" data-act="join" ${g.players.length >= g.max ? 'disabled' : ''}>Играть</button>`}
+        ${isHost ? `<button class="gbtn" data-act="start" ${g.players.length < g.min ? 'disabled' : ''}>Начать${g.players.length < g.min ? ` (нужно ${g.min})` : ''}</button>` : ''}
+      </div>
+      ${isHost ? `<div class="gbtns"><button class="gbtn sec" data-act="close">Отменить игру</button></div>` : ''}
+      <p class="glog">${isHost ? 'Когда все присоединятся — нажмите «Начать».' : 'Нажмите «Играть», чтобы участвовать.'}</p>`;
+    return;
+  }
+  if (g.type === 'durak') renderDurak(g, body); else renderTTT(g, body);
+  const after = g.status === 'over'
+    ? `<div class="gbtns">${isHost ? `<button class="gbtn" data-act="start">Ещё партию</button>` : ''}<button class="gbtn sec" data-act="close">${isHost || !g.host ? 'Закрыть игру' : 'Закрыть'}</button></div>`
+    : (isHost ? `<div class="gbtns"><button class="gbtn sec" data-act="close">Прервать партию</button></div>` : '');
+  body.insertAdjacentHTML('beforeend', after);
+  const st = g.state;
+  if (st && !st.over && st.deadline) {
+    const tick = () => { const el = body.querySelector('.tm[data-dl]'); if (!el) return; const sec = Math.max(0, Math.ceil((st.deadline - Date.now()) / 1000)); el.textContent = `⏱ ${sec}`; el.classList.toggle('low', sec <= 10); };
+    tick(); gameTimerIv = setInterval(tick, 1000);
+  }
+}
+
+function renderDurak(g, body) {
+  const s = g.state, L = s.legal, nm = id => esc(s.players.find(p => p.id === id)?.name || '?');
+  if (selCard && !(L && L.defend[selCard])) selCard = null;
+  let msg, mine = false;
+  if (s.over) msg = g.aborted ? `Партия прервана: ${esc(g.aborted)} вышел(-ла)` : s.loser ? (s.loser === me ? 'Вы — дурак 🤡' : `Дурак — ${nm(s.loser)} 🤡`) : 'Ничья 🤝';
+  else if (!L) msg = `Ходит ${nm(s.attacker)}, отбивается ${nm(s.defender)}`;
+  else if (s.defender === me) { mine = !s.taking; msg = s.taking ? 'Вы берёте — ждём, подкинут ли ещё' : selCard ? 'Выберите карту на столе, которую бьёте' : 'Отбивайтесь или берите'; }
+  else if (!s.table.length && L.attack.length) { mine = true; msg = 'Ваш ход — выберите карту'; }
+  else if (L.pass) { mine = true; msg = L.attack.length ? 'Подкиньте или нажмите «' + (s.table.every(t => t.d) ? 'Бито' : 'Пас') + '»' : 'Подкинуть нечего'; }
+  else msg = `Ходит ${nm(s.attacker)}, отбивается ${nm(s.defender)}`;
+  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.id === s.attacker ? 'att' : ''} ${p.id === s.defender ? 'def' : ''} ${p.out ? 'out' : ''}">
+      <div>${esc(p.name)}</div><div class="cnt">${p.out ? '✅ вышел' : `🂠 ${p.count}`}${p.id === s.defender && !p.out ? ' · 🛡' : p.id === s.attacker && !p.out ? ' · ⚔️' : ''}${s.passed.includes(p.id) ? ' · пас' : ''}</div></div>`).join('');
+  const targets = selCard ? L.defend[selCard] : [];
+  const table = s.table.map((t, i) => `<div class="pair ${targets.includes(i) ? 'target' : ''}" ${targets.includes(i) ? `data-act="target:${i}"` : ''}>${cardHTML(t.a)}${t.d ? cardHTML(t.d, 'd') : ''}</div>`).join('');
+  const deck = s.deck ? `<div class="deckbox">${cardHTML(s.trumpCard, 'trumpc')}<div class="card back"></div><div class="n">${s.deck} · козырь ${SUIT[s.trump]}</div></div>`
+    : `<div class="deckbox" title="Козырь">${cardHTML(s.trumpCard)}<div class="n">козырь ${SUIT[s.trump]}</div></div>`;
+  const hand = s.hand || [];
+  const playable = c => L && (L.attack.includes(c) || L.defend[c]);
+  const handHTML = hand.map(c => cardHTML(c, c === selCard ? 'sel' : playable(c) ? 'ok' : (L && (mine || s.defender === me) ? 'no' : ''), `card:${c}`)).join('');
+  const acts = [];
+  if (L?.take) acts.push(`<button class="gbtn warn" data-act="take">Взять</button>`);
+  if (L?.pass) acts.push(`<button class="gbtn sec" data-act="pass">${s.table.every(t => t.d) ? 'Бито' : 'Пас'}</button>`);
+  body.innerHTML = `
+    <div class="gstatus ${mine ? 'my' : ''}"><span>${msg}</span>${!s.over ? `<span class="tm" data-dl></span>` : ''}</div>
+    <div class="opps">${opp}</div>
+    <div class="board">${deck}<div class="tbl">${table || '<span class="glog" style="color:#cfe">Стол пуст</span>'}</div></div>
+    <div class="glog">${s.log.map(esc).join(' · ')}</div>
+    ${acts.length ? `<div class="gbtns">${acts.join('')}</div>` : ''}
+    ${s.hand ? `<div class="hand" id="hand">${handHTML}</div>` : '<p class="glog">Вы смотрите партию как зритель</p>'}`;
+  fitHand();
+}
+// Подгоняем веер карт по ширине панели, чтобы 6–20 карт помещались без прокрутки
+function fitHand() {
+  const h = $('#hand'); if (!h) return;
+  const n = h.children.length; if (!n) return;
+  const W = h.clientWidth - 8, w = Math.min(64, Math.max(44, W / 6.2));
+  h.style.setProperty('--w', w + 'px');
+  const ov = n > 1 ? Math.min(6, (W - n * w) / (n - 1)) : 0;
+  h.style.setProperty('--ov', Math.max(-w * 0.72, ov) + 'px');
+}
+addEventListener('resize', () => gameView && scheduleRender());
+
+function renderTTT(g, body) {
+  const s = g.state, L = s.legal;
+  const pl = id => s.players.find(p => p.id === id);
+  let msg, mine = false;
+  if (s.over) msg = g.aborted ? `Партия прервана: ${esc(g.aborted)} вышел(-ла)` : s.draw ? 'Ничья 🤝' : s.winner === me ? (s.forfeit ? 'Победа — соперник не успел 🏆' : 'Вы победили 🏆') : `Победил(-а) ${esc(pl(s.winner)?.name)}${s.forfeit ? ' (время вышло)' : ''}`;
+  else if (s.turn === me) { mine = true; msg = `Ваш ход (${pl(me).mark === 'X' ? '✕' : '◯'})`; }
+  else msg = `Ходит ${esc(pl(s.turn)?.name)}`;
+  const cells = s.board.map((v, i) => {
+    const can = L && L.place.includes(i);
+    return `<button class="${v || ''} ${can ? 'can' : ''} ${s.line?.includes(i) ? 'win' : ''}" ${can ? `data-act="cell:${i}"` : 'disabled'}>${v === 'X' ? '✕' : v === 'O' ? '◯' : ''}</button>`;
+  }).join('');
+  body.innerHTML = `<div class="gstatus ${mine ? 'my' : ''}"><span>${msg}</span>${!s.over ? `<span class="tm" data-dl></span>` : ''}</div>
+    <div class="opps">${s.players.map(p => `<div class="opp ${p.id === s.turn && !s.over ? 'att' : ''}">${esc(p.name)}${p.id === me ? ' (вы)' : ''}<div class="cnt">${p.mark === 'X' ? '✕' : '◯'}</div></div>`).join('')}</div>
+    <div class="ttt">${cells}</div>`;
+}
+
+// Один обработчик на всю панель: быстрые нажатия без лишних подписок
+$('#gameBody').addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const [act, arg] = el.dataset.act.split(/:(.*)/s);
+  const g = gameView, L = g?.state?.legal;
+  switch (act) {
+    case 'create': gsend('create', { game: arg }); break;
+    case 'join': case 'leave': case 'start': case 'close': gsend(act); break;
+    case 'take': case 'pass': gsend('move', { move: { t: act } }); break;
+    case 'cell': gsend('move', { move: { t: 'place', i: +arg } }); break;
+    case 'card': {
+      if (!L) return;
+      if (L.attack.includes(arg)) { gsend('move', { move: { t: 'attack', card: arg } }); break; }
+      const t = L.defend[arg];
+      if (!t) { toast(g.state.defender === me ? 'Этой картой не побить' : 'Этой картой сейчас нельзя ходить'); break; }
+      if (t.length === 1) { selCard = null; gsend('move', { move: { t: 'defend', card: arg, idx: t[0] } }); }
+      else { selCard = selCard === arg ? null : arg; renderGame(); }
+      break;
+    }
+    case 'target': if (selCard) { gsend('move', { move: { t: 'defend', card: selCard, idx: +arg } }); selCard = null; } break;
+  }
+});
+$('#bGames').onclick = () => toggleGames();
+$('#gamesClose').onclick = () => toggleGames(false);
 
 // ---------- вход/выход ----------
 function setHint(t, err) { $('#hint').textContent = t; $('#hint').classList.toggle('err', !!err); }
@@ -685,6 +968,7 @@ $('#testSnd').onclick = () => {
 $('#lSet').innerHTML = $('#bSet').innerHTML = IC.gear;
 $('#bScreen').innerHTML = IC.screen; $('#bLeave').innerHTML = IC.leave;
 $('#bChat').insertAdjacentHTML('afterbegin', IC.chat);
+$('#bGames').insertAdjacentHTML('afterbegin', IC.game);
 $('#lMic').onclick = $('#bMic').onclick = toggleMic;
 $('#lCam').onclick = $('#bCam').onclick = toggleCam;
 $('#lSet').onclick = $('#bSet').onclick = openSettings;
