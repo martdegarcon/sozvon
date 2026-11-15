@@ -104,7 +104,7 @@ const Durak = {
       const c = [...p.hand].sort((a, b) => sortKey(a, s.trump) - sortKey(b, s.trump))[0];
       p.hand.splice(p.hand.indexOf(c), 1);
       s.table.push({ a: c, d: null });
-      s.log.push(`${p.name} долго думал — сходил автоматически`);
+      s.log.push(`${p.name} не успел(а) — ход сделан автоматически`);
     } else {
       if (s.table.some(t => !t.d) && !s.taking) { s.taking = true; s.log.push(`${s.players[s.defender].name} не успел отбиться — берёт`); }
       s.players.forEach((p, i) => { if (i !== s.defender && !p.out && !s.passed.includes(p.id)) s.passed.push(p.id); });
@@ -393,8 +393,148 @@ function spyDeadline(s) {
   s.deadline = s.accusation ? s.accusation.deadline : s.phase === 'final' ? s.finalEnds : s.endsAt;
 }
 
+/* ============================== БАР ЛЖЕЦОВ ============================== */
+// Колода 20 карт: 6 К, 6 Д, 6 Т, 2 джокера (в режиме «Дьявол» один джокер заменён дьяволом).
+// Каждый раунд — «карта стола». Кладёшь 1–3 карты рубашкой вверх, утверждая, что это карты стола.
+// Следующий может крикнуть «Лжец!». Соврал — рулетка тебе, сказал правду — рулетка обвинившему.
+// У каждого свой револьвер: 6 гнёзд, 1 боевой. Последний выживший побеждает.
+const LIAR_FACES = ['K', 'Q', 'A'];
+const LIAR_REVEAL_MS = 5000;
+
+function makeLiar({ devil = false } = {}) {
+  const E = {
+    title: devil ? 'Бар лжецов · Дьявол' : 'Бар лжецов', min: 2, max: 4,
+
+    init(players, { rng = Math.random, now = Date.now(), timeout = 40000 } = {}) {
+      if (players.length < 2 || players.length > 4) fail('Нужно от 2 до 4 игроков');
+      const s = {
+        players: players.map(p => ({ id: p.id, name: p.name, hand: [], alive: true, bullet: Math.floor(rng() * 6), shots: 0 })),
+        devil, rng, timeout, table: null, turn: 0, last: null, phase: 'play', reveal: null,
+        over: false, winner: null, round: 0, deadline: 0, log: [],
+      };
+      liarDeal(s, Math.floor(rng() * players.length), now);
+      return s;
+    },
+
+    legal(s, pid) {
+      const i = s.players.findIndex(p => p.id === pid);
+      if (i < 0 || s.over || s.phase !== 'play' || i !== s.turn || !s.players[i].alive) return null;
+      const forced = liarForced(s, i);
+      return { play: !forced && s.players[i].hand.length > 0, call: !!s.last, forced };
+    },
+
+    move(s, pid, m, now = Date.now()) {
+      const L = E.legal(s, pid);
+      if (!L) fail(s.over ? 'Игра окончена' : s.phase === 'reveal' ? 'Подождите, идёт вскрытие' : 'Сейчас не ваш ход');
+      const i = s.players.findIndex(p => p.id === pid), p = s.players[i];
+      if (m && m.t === 'play') {
+        if (!L.play) fail(L.forced ? 'У остальных кончились карты — придётся проверить' : 'Нечего класть');
+        const cards = Array.isArray(m.cards) ? m.cards : [];
+        if (cards.length < 1 || cards.length > 3) fail('Положите от 1 до 3 карт');
+        const idx = [...new Set(cards)].map(k => Number(k));
+        if (idx.length !== cards.length || idx.some(k => !Number.isInteger(k) || k < 0 || k >= p.hand.length)) fail('Таких карт у вас нет');
+        const played = idx.map(k => p.hand[k]);
+        p.hand = p.hand.filter((_, k) => !idx.includes(k));
+        s.last = { by: pid, cards: played };
+        s.pile.push(...played);
+        s.log.push(`${p.name}: «${played.length} × ${LIAR_RU[s.table]}»`);
+        s.turn = liarNext(s, i);
+        s.deadline = now + s.timeout;
+      } else if (m && m.t === 'call') {
+        if (!L.call) fail('Проверять пока нечего');
+        liarCall(s, i, now);
+      } else fail('Неизвестный ход');
+    },
+
+    tick(s, now = Date.now()) {
+      if (s.over || now < s.deadline) return false;
+      if (s.phase === 'reveal') { liarAfterReveal(s, now); return true; }
+      const i = s.turn, p = s.players[i], L = E.legal(s, p.id);
+      if (L.play) {                                   // задумался — кладём одну карту, предпочитая честную
+        let k = p.hand.findIndex(c => c === s.table || c === 'J');
+        if (k < 0) k = 0;
+        s.log.push(`${p.name} не успел(а) — карта выложена автоматически`);
+        E.move(s, p.id, { t: 'play', cards: [k] }, now);
+      } else E.move(s, p.id, { t: 'call' }, now);
+      return true;
+    },
+
+    view(s, viewer) {
+      const me = s.players.find(p => p.id === viewer);
+      const r = s.reveal;
+      return {
+        table: s.table, phase: s.phase, round: s.round, over: s.over, winner: s.winner, deadline: s.deadline, devil: s.devil,
+        turn: s.players[s.turn].id, log: s.log.slice(-4),
+        last: s.last ? { by: s.last.by, count: s.last.cards.length } : null, pile: s.pile.length,
+        reveal: r ? { by: r.by, caller: r.caller, cards: r.cards, lied: r.lied, devil: r.devil, shots: r.shots, at: r.at } : null,
+        players: s.players.map(p => ({ id: p.id, name: p.name, count: p.hand.length, alive: p.alive, shots: p.shots })),
+        hand: me && me.alive ? me.hand : null,
+        legal: E.legal(s, viewer),
+      };
+    },
+  };
+  return E;
+}
+const LIAR_RU = { K: 'Король', Q: 'Дама', A: 'Туз', J: 'Джокер', D: 'Дьявол' };
+const liarAlive = s => s.players.filter(p => p.alive);
+function liarDeal(s, start, now) {
+  const deck = shuffle([...'KKKKKKQQQQQQAAAAAA', 'J', s.devil ? 'D' : 'J'], s.rng);
+  for (const p of s.players) p.hand = p.alive ? deck.splice(0, 5) : [];
+  s.table = LIAR_FACES[Math.floor(s.rng() * 3)];
+  s.turn = s.players[start].alive ? start : liarNextAlive(s, start);
+  s.last = null; s.pile = []; s.phase = 'play'; s.reveal = null; s.round++;
+  s.deadline = now + s.timeout;
+}
+function liarNextAlive(s, i) {
+  const n = s.players.length;
+  for (let k = 1; k <= n; k++) { const j = (i + k) % n; if (s.players[j].alive) return j; }
+  return i;
+}
+// Следующий ход: живой игрок с картами; если карты есть только у положившего — следующий обязан проверить
+function liarNext(s, i) {
+  const n = s.players.length;
+  for (let k = 1; k < n; k++) { const j = (i + k) % n; if (s.players[j].alive && s.players[j].hand.length) return j; }
+  return liarNextAlive(s, i);
+}
+function liarForced(s, i) {
+  if (!s.last) return false;
+  if (!s.players[i].hand.length) return true;
+  return liarAlive(s).every(p => p === s.players[i] || !p.hand.length);
+}
+function liarCall(s, i, now) {
+  const caller = s.players[i], liar = s.players.find(p => p.id === s.last.by);
+  const cards = s.last.cards;
+  const hasDevil = cards.includes('D');
+  const lied = cards.some(c => c !== s.table && c !== 'J' && c !== 'D');
+  let shooters;
+  if (hasDevil) shooters = liarAlive(s).filter(p => p !== liar);         // дьявол: стреляют все, кроме подложившего
+  else shooters = [lied ? liar : caller];
+  const shots = shooters.map(p => {
+    const died = p.shots === p.bullet;
+    const chance = 6 - p.shots;                                         // шанс был 1 из chance
+    p.shots++;
+    if (died) p.alive = false;
+    return { id: p.id, died, chance };
+  });
+  s.log.push(`${caller.name}: «Лжец!» — ${hasDevil ? 'это был ДЬЯВОЛ 😈' : lied ? `${liar.name} соврал(а)` : `${liar.name} не врал(а)`}`);
+  for (const sh of shots) {
+    const p = s.players.find(x => x.id === sh.id);
+    s.log.push(sh.died ? `💥 ${p.name} выбывает` : `🔫 ${p.name}: щёлк… повезло`);
+  }
+  s.reveal = { by: liar.id, caller: caller.id, cards, lied, devil: hasDevil, shots, at: now, next: shooters[0] };
+  s.phase = 'reveal';
+  s.deadline = now + LIAR_REVEAL_MS;
+  const alive = liarAlive(s);
+  if (alive.length <= 1) { s.over = true; s.winner = alive[0] ? alive[0].id : null; s.log.push(alive[0] ? `🏆 ${alive[0].name} — последний выживший` : 'Не выжил никто'); }
+}
+function liarAfterReveal(s, now) {
+  const r = s.reveal;
+  const nextIdx = s.players.findIndex(p => p.id === (r.devil ? r.by : r.next.id));
+  liarDeal(s, nextIdx, now);
+}
+
 /* ============================== Общая обвязка комнаты ============================== */
-const ENGINES = { durak: Durak, ttt: TicTacToe, spy: Spy };
+const ENGINES = { durak: Durak, ttt: TicTacToe, spy: Spy, liar: makeLiar(), liardevil: makeLiar({ devil: true }) };
 
 function create(type, host) {
   if (!ENGINES[type]) fail('Неизвестная игра');
@@ -456,4 +596,4 @@ function view(g, viewer) {
     players: g.players, aborted: g.aborted, state: g.s ? E.view(g.s, viewer) : null };
 }
 
-module.exports = { GameError, Durak, TicTacToe, Spy, SPY_LOCATIONS, ENGINES, create, handle, onLeave, tick, deadline, view, beats, fullDeck, suit, rank };
+module.exports = { GameError, Durak, TicTacToe, Spy, SPY_LOCATIONS, makeLiar, ENGINES, create, handle, onLeave, tick, deadline, view, beats, fullDeck, suit, rank };

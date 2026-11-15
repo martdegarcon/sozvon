@@ -128,6 +128,7 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
 #games{width:440px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel);min-height:0}
 @media(max-width:700px),(max-height:500px){#games{position:fixed;inset:0;bottom:var(--fh,70px);width:auto;z-index:6;padding-top:env(safe-area-inset-top)}}
 #gameBody{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+#gameBody>*{flex-shrink:0}
 .gl{display:grid;gap:10px}
 .gcard{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;text-align:left;width:100%}
 .gcard:hover{border-color:var(--acc)}
@@ -197,6 +198,31 @@ footer{display:flex;justify-content:center;gap:10px;padding:12px;padding-bottom:
 .locs button.pick{border-color:#ffd84d;background:#3a3412}
 details.lc summary{cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0}
 .gres{text-align:center;font-size:20px;font-weight:700;padding:6px 0}
+.lbar{background:radial-gradient(ellipse at center,#4a2a18 0%,#2a170d 80%);border-radius:16px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;border:1px solid #6b3f22}
+.tcard{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+.tcard .card{--w:44px}
+.pile{display:flex;align-items:center;gap:10px;min-height:76px;justify-content:center;flex-wrap:wrap}
+.pile .card{--w:44px}
+.pile .stack{display:flex}.pile .stack .card+.card{margin-left:-28px}
+.claim{font-size:14px;color:#f3d9b0;text-align:center}
+.rev{display:flex;flex-direction:column;align-items:center;gap:8px}
+.rev .verdict{font-size:20px;font-weight:800}
+.rev .verdict.lie{color:#ff6b6b}.rev .verdict.truth{color:#5fe0a0}
+.shot{font-size:18px;font-weight:700;text-align:center}
+.shot.spin{animation:shake .25s infinite}
+@keyframes shake{25%{transform:translateX(-3px) rotate(-2deg)}75%{transform:translateX(3px) rotate(2deg)}}
+.gun{display:inline-flex;gap:3px;vertical-align:middle}
+.gun i{width:8px;height:8px;border-radius:50%;border:1px solid #9aa;display:inline-block}
+.gun i.f{background:#9aa}
+.opp.dead{opacity:.4;text-decoration:line-through}
+.opp.turn{box-shadow:0 0 0 2px #ffd84d}
+.card.J{color:#7b3fe4}.card.D{background:#220a0a;color:#ff4d4d;border:2px solid #ff4d4d}
+.hand.lh .card{cursor:pointer}
+.hand.lh .card.pickd{box-shadow:0 0 0 3px #ffd84d,0 2px 6px rgba(0,0,0,.35);transform:translateY(-14px)}
+.hand.lh .card.match{box-shadow:0 0 0 2px var(--green),0 2px 6px rgba(0,0,0,.35)}
+.gbtn.liar{background:var(--red);font-size:17px}
+.gbtns.stick{position:sticky;bottom:-12px;margin:0 -12px -12px;padding:14px 12px 12px;background:linear-gradient(transparent,var(--panel) 35%);z-index:2}
+@media(max-width:700px),(max-height:500px){.lbar{padding:10px;gap:6px}.lbar .tcard{font-size:16px}}
 /* --- settings --- */
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(520px,94vw)}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -221,7 +247,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 #toast{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));width:max-content;max-width:min(440px,92vw);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:50;pointer-events:none}
 #toast div{background:#000d;border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-size:14px;animation:fade 4s forwards}
 @keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%,85%{opacity:1;transform:none}100%{opacity:0}}
-@media(max-width:700px),(max-height:500px){#toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}}
+@media(max-width:700px),(max-height:500px){#toast{top:auto;bottom:calc(var(--fh,70px) + 10px);flex-direction:column-reverse}body.gopen #toast{bottom:calc(var(--fh,70px) + 96px)}}
 </style>
 </head>
 <body>
@@ -780,7 +806,8 @@ function toggleGames(force) {
   const open = force ?? $('#games').classList.contains('hidden');
   $('#games').classList.toggle('hidden', !open);
   $('#bGames').classList.toggle('on', open);
-  if (open) { $('#gbadge').classList.add('hidden'); if (isNarrow()) toggleChat(false); renderGame(); }
+  document.body.classList.toggle('gopen', open);
+  if (open) { $('#toast').innerHTML = ''; $('#gbadge').classList.add('hidden'); if (isNarrow()) toggleChat(false); renderGame(); }
   setTimeout(layout, 0);
 }
 
@@ -815,6 +842,8 @@ function renderGame() {
     body.innerHTML = `<div class="gl">
       <button class="gcard" data-act="create:durak"><span class="ico">🃏</span><span><b>Дурак</b><small>Подкидной, 36 карт · 2–6 игроков</small></span></button>
       <button class="gcard" data-act="create:spy"><span class="ico">🕵️</span><span><b>Шпион</b><small>Вычислите шпиона, не выдав локацию · 3–8 игроков</small></span></button>
+      <button class="gcard" data-act="create:liar"><span class="ico">🍺</span><span><b>Бар лжецов</b><small>Блеф картами и русская рулетка · 2–4 игрока</small></span></button>
+      <button class="gcard" data-act="create:liardevil"><span class="ico">😈</span><span><b>Бар лжецов · Дьявол</b><small>В колоде карта дьявола: вскрыли — стреляют все, кроме того, кто её положил</small></span></button>
       <button class="gcard" data-act="create:ttt"><span class="ico">⭕</span><span><b>Крестики-нолики</b><small>3×3 · 2 игрока</small></span></button>
     </div><p class="glog">Выберите игру — остальные участники звонка получат приглашение.</p>`;
     return;
@@ -831,7 +860,7 @@ function renderGame() {
       <p class="glog">${isHost ? 'Когда все присоединятся — нажмите «Начать».' : 'Нажмите «Играть», чтобы участвовать.'}</p>`;
     return;
   }
-  if (g.type === 'durak') renderDurak(g, body); else if (g.type === 'spy') renderSpy(g, body); else renderTTT(g, body);
+  if (g.type === 'durak') renderDurak(g, body); else if (g.type === 'spy') renderSpy(g, body); else if (g.type === 'liar' || g.type === 'liardevil') renderLiar(g, body); else renderTTT(g, body);
   const after = g.status === 'over'
     ? `<div class="gbtns">${isHost ? `<button class="gbtn" data-act="start">Ещё партию</button>` : ''}<button class="gbtn sec" data-act="close">${isHost || !g.host ? 'Закрыть игру' : 'Закрыть'}</button></div>`
     : (isHost ? `<div class="gbtns"><button class="gbtn sec" data-act="close">Прервать партию</button></div>` : '');
@@ -981,11 +1010,84 @@ function spyClick(act, arg) {
   return true;
 }
 
+
+// ---------- Бар лжецов ----------
+const LF = { K: ['К', '♚', 'Король', 'Короли'], Q: ['Д', '♛', 'Дама', 'Дамы'], A: ['Т', '★', 'Туз', 'Тузы'], J: ['Дж', '🃏', 'Джокер'], D: ['☠', '😈', 'Дьявол'] };
+const lcard = (c, cls = '', act = '') => `<div class="card ${c} ${cls}" ${act ? `data-act="${act}"` : ''}><span>${LF[c][0]}</span><span class="c">${LF[c][1]}</span><span class="r2">${LF[c][0]}</span></div>`;
+const gun = shots => `<span class="gun" title="Выстрелов: ${shots} из 6">${Array.from({ length: 6 }, (_, k) => `<i class="${k < shots ? 'f' : ''}"></i>`).join('')}</span>`;
+let liarPick = [], liarKey = '', liarRevealTimer = null;
+const SPIN_MS = 1600;   // пауза «барабан крутится», прежде чем показать результат выстрела
+function renderLiar(g, body) {
+  const s = g.state, L = s.legal, nm = id => esc(s.players.find(p => p.id === id)?.name || '?');
+  const key = s.round + ':' + (s.hand || []).join('');
+  if (key !== liarKey) { liarKey = key; liarPick = []; }
+  liarPick = liarPick.filter(k => s.hand && k < s.hand.length);
+  const meP = s.players.find(p => p.id === me);
+  const spinningNow = s.reveal && Date.now() - s.reveal.at < SPIN_MS;   // не спойлерим исход выстрела
+  let msg, mine = false;
+  if (s.over && !s.reveal) msg = g.aborted ? `Партия прервана: ${esc(g.aborted)} вышел(-ла)` : 'Партия окончена';
+  else if (s.phase === 'reveal') msg = `${nm(s.reveal.caller)} кричит «Лжец!»`;
+  else if (meP && !meP.alive) msg = 'Вы выбыли 💀 — смотрите, кто выживет';
+  else if (L) { mine = true; msg = L.forced ? 'Карты остались только у вас — проверяйте!' : s.last ? 'Ваш ход: положите карты или крикните «Лжец!»' : 'Ваш ход: положите 1–3 карты'; }
+  else msg = `Ходит ${nm(s.turn)}`;
+
+  const opp = s.players.filter(p => p.id !== me).map(p => `<div class="opp ${p.alive ? '' : 'dead'} ${p.id === s.turn && s.phase === 'play' && !s.over ? 'turn' : ''}">
+    <div>${esc(p.name)}</div><div class="cnt">${p.alive ? `🂠 ${p.count} · ${gun(p.shots)}` : '💀'}</div></div>`).join('');
+
+  let center;
+  const tableName = LF[s.table][3];
+  if (s.phase === 'reveal' && s.reveal) {
+    const r = s.reveal, spinning = Date.now() - r.at < SPIN_MS;
+    const verdict = r.devil ? `<div class="verdict lie">😈 ДЬЯВОЛ!</div>` : r.lied ? `<div class="verdict lie">${nm(r.by)} врёт!</div>` : `<div class="verdict truth">${nm(r.by)} не врёт</div>`;
+    const shots = r.shots.map(x => spinning
+      ? `<div class="shot spin">🔫 ${nm(x.id)} крутит барабан… (шанс 1 из ${x.chance})</div>`
+      : `<div class="shot">${x.died ? `💥 БАХ! ${nm(x.id)} выбывает` : `😮‍💨 Щёлк… ${nm(x.id)} повезло`}</div>`).join('');
+    center = `<div class="rev"><div class="claim">Карта стола — ${tableName}. ${nm(r.by)} выложил(а):</div><div class="pile">${r.cards.map(c => lcard(c)).join('')}</div>${verdict}${shots}</div>`;
+    if (spinning) { clearTimeout(liarRevealTimer); liarRevealTimer = setTimeout(scheduleRender, SPIN_MS - (Date.now() - r.at) + 30); }
+  } else {
+    const backs = n => `<div class="stack">${Array.from({ length: Math.min(n, 8) }, () => '<div class="card back"></div>').join('')}</div>`;
+    center = s.last
+      ? `<div class="pile">${backs(s.pile)}</div><div class="claim">${nm(s.last.by)}: «${s.last.count} × ${LF[s.table][2]}» · в стопке ${s.pile}</div>`
+      : `<div class="claim">Стол пуст — ${nm(s.turn)} начинает</div>`;
+  }
+  const hand = s.hand || [];
+  const handHTML = hand.map((c, k) => lcard(c, `${liarPick.includes(k) ? 'pickd' : ''} ${c === s.table || c === 'J' ? 'match' : ''}`, L?.play ? `lpick:${k}` : '')).join('');
+  const acts = [];
+  if (L?.play) acts.push(`<button class="gbtn" data-act="lplay" ${liarPick.length ? '' : 'disabled'}>${liarPick.length ? `Положить ${liarPick.length} как «${LF[s.table][3].toLowerCase()}»` : 'Выберите 1–3 карты'}</button>`);
+  if (L?.call) acts.push(`<button class="gbtn liar" data-act="lcall">Лжец!</button>`);
+  const winner = s.over && s.winner && !spinningNow ? `<div class="gres">🏆 ${s.winner === me ? 'Вы выжили!' : `${nm(s.winner)} — последний выживший`}</div>` : '';
+  body.innerHTML = `
+    <div class="gstatus ${mine ? 'my' : ''}"><span>${msg}</span>${!s.over && s.phase === 'play' ? `<span class="tm" data-dl></span>` : ''}</div>
+    ${winner}
+    <div class="opps">${opp}</div>
+    <div class="lbar">
+      <div class="tcard">Карта стола: ${lcard(s.table)} ${tableName}</div>
+      ${center}
+    </div>
+    ${meP && meP.alive && s.hand ? `<div class="hand lh" id="hand">${handHTML}</div>` : ''}
+    ${meP && meP.alive && s.hand ? `<div class="glog">Ваш револьвер: ${gun(meP.shots)} · следующий выстрел — шанс 1 из ${6 - meP.shots}</div>` : ''}
+    <div class="glog">${spinningNow ? '' : s.log.slice(-3).map(esc).join(' · ')}</div>
+    ${!meP ? '<p class="glog">Вы смотрите партию как зритель</p>' : ''}
+    ${acts.length ? `<div class="gbtns stick">${acts.join('')}</div>` : ''}`;
+  fitHand();
+}
+function liarClick(act, arg) {
+  const s = gameView?.state;
+  if (act === 'lpick') {
+    const k = +arg, i = liarPick.indexOf(k);
+    if (i >= 0) liarPick.splice(i, 1); else if (liarPick.length < 3) liarPick.push(k); else toast('Не больше 3 карт');
+    scheduleRender(); return;
+  }
+  if (act === 'lplay' && liarPick.length) { gsend('move', { move: { t: 'play', cards: [...liarPick] } }); liarPick = []; return; }
+  if (act === 'lcall') gsend('move', { move: { t: 'call' } });
+}
+
 // Один обработчик на всю панель: быстрые нажатия без лишних подписок
 $('#gameBody').addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const [act, arg] = el.dataset.act.split(/:(.*)/s);
   const g = gameView, L = g?.state?.legal;
+  if (act === 'lpick' || act === 'lplay' || act === 'lcall') { liarClick(act, arg); return; }
   if (act.startsWith('spy')) {
     // details/summary не должен сворачиваться при клике по локации
     if (act === 'spyloc') e.preventDefault();

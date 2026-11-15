@@ -396,3 +396,159 @@ test('шпион: фаззинг 2000 случайных партий — все
     assert.ok(s.reason);
   }
 });
+
+/* ---------------- Бар лжецов ---------------- */
+const Liar = G.makeLiar(), LiarDevil = G.makeLiar({ devil: true });
+const liarAllCards = s => [...s.players.flatMap(p => p.hand), ...s.pile];
+function liarSet(s, hands, table = 'Q', turn = 0) {
+  s.players.forEach((p, i) => { p.hand = [...hands[i]]; });
+  s.table = table; s.turn = turn; s.last = null;
+}
+
+test('бар: раздача 4 × 5 = вся колода из 20 карт (6К 6Д 6Т 2Дж), карта стола К/Д/Т', () => {
+  for (let seed = 1; seed < 50; seed++) {
+    const s = Liar.init(P(4), { rng: rng(seed) });
+    const all = s.players.flatMap(p => p.hand).sort().join('');
+    assert.equal(all, 'AAAAAAJJKKKKKKQQQQQQ');
+    assert.ok(['K', 'Q', 'A'].includes(s.table));
+    s.players.forEach(p => { assert.ok(p.bullet >= 0 && p.bullet < 6); assert.equal(p.shots, 0); });
+  }
+  const d = LiarDevil.init(P(4), { rng: rng(1) });
+  assert.equal(d.players.flatMap(p => p.hand).filter(c => c === 'D').length, 1, 'в режиме дьявола — одна карта дьявола');
+});
+
+test('бар: класть можно 1–3 своих карты и только в свой ход; первым ходом проверять нечего', () => {
+  const s = Liar.init(P(3), { rng: rng(2) });
+  liarSet(s, [['Q', 'K', 'A', 'Q', 'J'], ['Q', 'Q', 'K', 'A', 'A'], ['K', 'K', 'A', 'J', 'Q']]);
+  assert.throws(() => Liar.move(s, 'p1', { t: 'play', cards: [0] }), /не ваш ход/);
+  assert.throws(() => Liar.move(s, 'p0', { t: 'call' }), /нечего/);
+  assert.throws(() => Liar.move(s, 'p0', { t: 'play', cards: [] }), /от 1 до 3/);
+  assert.throws(() => Liar.move(s, 'p0', { t: 'play', cards: [0, 1, 2, 3] }), /от 1 до 3/);
+  assert.throws(() => Liar.move(s, 'p0', { t: 'play', cards: [0, 0] }), /нет/);
+  assert.throws(() => Liar.move(s, 'p0', { t: 'play', cards: [7] }), /нет/);
+  Liar.move(s, 'p0', { t: 'play', cards: [0, 4] });
+  assert.deepEqual(s.players[0].hand, ['K', 'A', 'Q']);
+  assert.equal(s.turn, 1);
+});
+
+test('бар: «Лжец!» на правду (с джокером) — стреляет обвинивший; на ложь — стреляет лжец', () => {
+  const s = Liar.init(P(3), { rng: rng(3) });
+  liarSet(s, [['Q', 'J', 'A', 'A', 'A'], ['Q', 'Q', 'K', 'A', 'A'], ['K', 'K', 'A', 'J', 'Q']]);
+  s.players.forEach(p => { p.bullet = 5; });                // никто не умрёт с первого выстрела
+  Liar.move(s, 'p0', { t: 'play', cards: [0, 1] });         // Д + джокер — это правда
+  Liar.move(s, 'p1', { t: 'call' }, 1000);
+  assert.equal(s.phase, 'reveal');
+  assert.equal(s.reveal.lied, false);
+  assert.deepEqual(s.reveal.shots.map(x => x.id), ['p1']);
+  assert.equal(s.players[1].shots, 1);
+  assert.equal(s.reveal.shots[0].chance, 6, 'шанс был 1 из 6');
+  assert.throws(() => Liar.move(s, 'p1', { t: 'play', cards: [0] }), /вскрытие/);
+  assert.ok(Liar.tick(s, 1000 + 5001));
+  assert.equal(s.phase, 'play');
+  assert.equal(s.round, 2, 'новая раздача');
+  assert.equal(s.players[s.turn].id, 'p1', 'новый раунд начинает стрелявший');
+
+  liarSet(s, [['K', 'Q', 'A', 'A', 'A'], ['Q', 'Q', 'K', 'A', 'A'], ['K', 'K', 'A', 'J', 'Q']], 'Q', 0);
+  Liar.move(s, 'p0', { t: 'play', cards: [0, 1] });         // К + Д — враньё
+  Liar.move(s, 'p1', { t: 'call' }, 2000);
+  assert.equal(s.reveal.lied, true);
+  assert.deepEqual(s.reveal.shots.map(x => x.id), ['p0']);
+});
+
+test('бар: револьвер — шанс растёт, шестой выстрел всегда боевой', () => {
+  for (let bullet = 0; bullet < 6; bullet++) {
+    const s = Liar.init(P(2), { rng: rng(bullet + 1) });
+    const p = s.players[0]; p.bullet = bullet;
+    let pulls = 0;
+    while (p.alive) {
+      liarSet(s, [['K', 'K', 'K', 'K', 'K'], ['A', 'A', 'A', 'A', 'A']], 'Q', 0);
+      s.phase = 'play'; s.reveal = null;
+      Liar.move(s, 'p0', { t: 'play', cards: [0] });
+      Liar.move(s, 'p1', { t: 'call' });
+      pulls++;
+      assert.equal(s.reveal.shots[0].chance, 7 - pulls);
+    }
+    assert.equal(pulls, bullet + 1);
+    assert.ok(pulls <= 6);
+    assert.ok(s.over); assert.equal(s.winner, 'p1');
+  }
+});
+
+test('бар: дьявол — при вскрытии стреляют все, кроме подложившего', () => {
+  const s = LiarDevil.init(P(4), { rng: rng(4) });
+  liarSet(s, [['D', 'K', 'A', 'A', 'A'], ['Q', 'Q', 'K', 'A', 'A'], ['K', 'K', 'A', 'J', 'Q'], ['Q', 'K', 'A', 'J', 'Q']]);
+  s.players.forEach(p => { p.bullet = 5; });
+  Liar.move.call(null, s, 'p0', { t: 'play', cards: [0] });
+  LiarDevil.move(s, 'p1', { t: 'call' });
+  assert.ok(s.reveal.devil);
+  assert.deepEqual(s.reveal.shots.map(x => x.id).sort(), ['p1', 'p2', 'p3']);
+  assert.equal(s.players[0].shots, 0);
+});
+
+test('бар: если карты остались только у одного — он обязан проверить; без карт ход пропускается', () => {
+  const s = Liar.init(P(3), { rng: rng(5) });
+  liarSet(s, [['Q'], [], ['K', 'K']], 'Q', 0);
+  Liar.move(s, 'p0', { t: 'play', cards: [0] });
+  assert.equal(s.turn, 2, 'p1 без карт пропущен');
+  const L = Liar.legal(s, 'p2');
+  assert.ok(L.forced && L.call && !L.play, 'у остальных карт нет — только «Лжец!»');
+  assert.throws(() => Liar.move(s, 'p2', { t: 'play', cards: [0] }), /придётся проверить/);
+});
+
+test('бар: таймаут — за молчащего ход делается сам, вскрытие само переходит в новый раунд', () => {
+  const s = Liar.init(P(2), { rng: rng(6), now: 0, timeout: 1000 });
+  liarSet(s, [['K', 'Q', 'A', 'A', 'A'], ['Q', 'Q', 'K', 'A', 'A']], 'Q', 0);
+  s.deadline = 1000;
+  assert.ok(Liar.tick(s, 1001));
+  assert.deepEqual(s.last.cards, ['Q'], 'автоход — честной картой, если есть');
+  assert.ok(Liar.tick(s, s.deadline + 1));
+  assert.equal(s.players[1].hand.length, 4, 'за второго тоже сходили');
+  s.players.forEach(p => { p.bullet = 5; });
+  Liar.move(s, 'p0', { t: 'call' }, s.deadline - 10);
+  assert.equal(s.phase, 'reveal');
+  assert.ok(Liar.tick(s, s.deadline + 1));
+  assert.equal(s.phase, 'play', 'вскрытие само переходит в новый раунд');
+});
+
+test('бар: чужие карты и содержимое стопки не видны до вскрытия, барабан не виден никому', () => {
+  const s = Liar.init(P(4), { rng: rng(7) });
+  const first = s.players[s.turn];
+  Liar.move(s, first.id, { t: 'play', cards: [0, 1] });
+  const other = s.players.find(p => p.id !== first.id);
+  const v = Liar.view(s, other.id);
+  assert.deepEqual(v.last, { by: first.id, count: 2 });
+  assert.ok(!('cards' in v.last));
+  assert.ok(v.players.every(p => !('hand' in p) && !('bullet' in p)));
+  assert.ok(!JSON.stringify(v).includes('bullet'));
+  assert.equal(v.hand.length, 5);
+});
+
+test('бар: фаззинг 3000 партий (обычный и дьявол, 2–4 игрока) — карты не теряются, всегда есть победитель или все выбыли', () => {
+  for (let seed = 1; seed <= 3000; seed++) {
+    const E = seed % 2 ? Liar : LiarDevil, n = 2 + (seed % 3), r = rng(seed);
+    let now = 0;
+    const s = E.init(P(n), { rng: r, now, timeout: 1000 });
+    for (let step = 0; step < 3000 && !s.over; step++) {
+      if (s.phase === 'play') {
+        const alive = s.players.filter(p => p.alive);
+        const total = liarAllCards(s).length;
+        assert.equal(total, alive.length * 5, `карты теряются (seed ${seed})`);
+        const p = s.players[s.turn];
+        assert.ok(p.alive);
+        const L = E.legal(s, p.id);
+        now += 10;
+        if (r() < 0.03) { Liar.tick.call(null, s, s.deadline + 1); E.tick(s, s.deadline + 1); continue; }
+        if (L.call && (!L.play || r() < 0.35)) E.move(s, p.id, { t: 'call' }, now);
+        else {
+          const k = 1 + Math.floor(r() * Math.min(3, p.hand.length));
+          E.move(s, p.id, { t: 'play', cards: [...Array(k).keys()] }, now);
+        }
+      } else { now = s.deadline + 1; E.tick(s, now); }
+    }
+    assert.ok(s.over, `партия seed=${seed} не закончилась`);
+    const alive = s.players.filter(p => p.alive);
+    assert.ok(alive.length <= 1);
+    assert.equal(s.winner, alive[0] ? alive[0].id : null);
+    s.players.forEach(p => assert.ok(p.shots <= 6));
+  }
+});
