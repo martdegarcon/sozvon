@@ -41,6 +41,9 @@ function createServer(opts = {}) {
     roomTtlMs: 5 * 60 * 1000, // пустая комната живёт 5 минут, потом удаляется целиком
     maxRooms: +process.env.MAX_ROOMS || 2000, // защита от «бесконечного» создания комнат
     sweepMs: 60 * 1000,       // фоновая уборка — страховка на случай, если таймер не сработал
+    voteMs: 40 * 1000,        // сколько длится голосование за исключение
+    banMs: 10 * 60 * 1000,    // исключённый не может вернуться в комнату 10 минут
+    voteCooldownMs: 20 * 1000, // один человек не может запускать голосования чаще
     env: process.env,
     ...opts,
   };
@@ -82,7 +85,7 @@ function createServer(opts = {}) {
     let room = rooms.get(name);
     if (!room) {
       if (rooms.size >= cfg.maxRooms) return null;
-      room = { name, peers: new Map(), history: [], game: null, gameTimer: null, timer: null, emptySince: 0 };
+      room = { name, peers: new Map(), history: [], game: null, gameTimer: null, timer: null, emptySince: 0, polls: new Map(), bans: new Map() };
       rooms.set(name, room);
     }
     clearTimeout(room.timer);
@@ -92,6 +95,8 @@ function createServer(opts = {}) {
   function dropRoom(room) {
     clearTimeout(room.timer); clearTimeout(room.gameTimer);
     room.game = null; room.history = [];
+    for (const v of room.polls.values()) clearTimeout(v.timer);
+    room.polls.clear();
     if (rooms.get(room.name) === room) rooms.delete(room.name);
   }
   function maybeDropRoom(room) {
@@ -115,6 +120,71 @@ function createServer(opts = {}) {
     broadcast(room, 'leave', { id: peer.id });
   }
 
+  // ---------- голосование за исключение ----------
+  // Голосуют все, кроме того, кого исключают. Нужно больше половины голосов «за».
+  function pollCount(room, v) {
+    const voters = [...room.peers.keys()].filter(id => id !== v.target);
+    const yes = voters.filter(id => v.yes.has(id)).length, no = voters.filter(id => v.no.has(id)).length;
+    return { n: voters.length, yes, no, need: Math.floor(voters.length / 2) + 1 };
+  }
+  const pollView = (room, v) => ({ target: v.target, name: v.name, by: v.by, deadline: v.deadline, yesIds: [...v.yes], noIds: [...v.no], ...pollCount(room, v) });
+  function pollSend(room, event, data, target) { for (const p of room.peers.values()) if (p.id !== target) sse(p.res, event, data); }
+  function endPoll(room, v, result) {
+    clearTimeout(v.timer);
+    if (room.polls.get(v.target) !== v) return;
+    room.polls.delete(v.target);
+    pollSend(room, 'vote-end', { target: v.target, name: v.name, result }, v.target);
+  }
+  function kickPeer(room, v) {
+    if (v.dev) room.bans.set(v.dev, Date.now() + cfg.banMs);
+    const dep = departed.get(v.target);
+    if (dep) { clearTimeout(dep.timer); departed.delete(v.target); }
+    const t = room.peers.get(v.target);
+    if (t) {
+      t.kicked = true;
+      sse(t.res, 'kicked', { minutes: Math.round(cfg.banMs / 60000) });
+      detach(room, t);
+      t.res.end(); t.res.destroy();
+    }
+    endPoll(room, v, 'kicked');
+    gameLeave(room, v.target);
+  }
+  function evalPoll(room, v) {
+    if (room.polls.get(v.target) !== v) return;
+    const c = pollCount(room, v);
+    if (c.n && c.yes >= c.need) return kickPeer(room, v);
+    if (!c.n || c.n - c.no < c.need) return endPoll(room, v, 'failed');
+    pollSend(room, 'vote', pollView(room, v), v.target);
+  }
+  const evalPolls = room => { for (const v of [...room.polls.values()]) evalPoll(room, v); };
+  function handleVote(p, room, d) {
+    const op = d.op;
+    if (op === 'start') {
+      if (d.target === p.id) return;
+      const target = room.peers.get(d.target);
+      let v = room.polls.get(d.target);
+      if (!v) {
+        if (!target) return;
+        const now = Date.now();
+        if (p.lastPoll && now - p.lastPoll < cfg.voteCooldownMs) return sse(p.res, 'vote-error', { message: 'Подождите немного перед новым голосованием' });
+        p.lastPoll = now;
+        v = { target: target.id, name: target.name, dev: target.dev, by: p.name, yes: new Set(), no: new Set(), deadline: now + cfg.voteMs };
+        v.timer = setTimeout(() => endPoll(room, v, 'failed'), cfg.voteMs);
+        v.timer.unref?.();
+        room.polls.set(v.target, v);
+      }
+      v.no.delete(p.id); v.yes.add(p.id);
+      return evalPoll(room, v);
+    }
+    if (op === 'yes' || op === 'no') {
+      const v = room.polls.get(d.target);
+      if (!v || p.id === v.target) return;
+      (op === 'yes' ? v.no : v.yes).delete(p.id);
+      (op === 'yes' ? v.yes : v.no).add(p.id);
+      evalPoll(room, v);
+    }
+  }
+
   function handleEvents(req, res, u) {
     const roomName = cleanRoom(u.searchParams.get('room'));
     const name = String(u.searchParams.get('name') || 'Гость').trim().slice(0, 40) || 'Гость';
@@ -131,6 +201,10 @@ function createServer(opts = {}) {
 
     const room = getRoom(roomName);
     if (!room) { sse(res, 'busy', {}); return res.end(); }
+    const dev = String(u.searchParams.get('dev') || '').replace(/[^a-f0-9]/g, '').slice(0, 40);
+    const ban = dev && room.bans.get(dev);
+    if (ban && ban > Date.now()) { sse(res, 'kicked', { banned: true, minutes: Math.ceil((ban - Date.now()) / 60000) }); res.end(); return maybeDropRoom(room); }
+    if (ban) room.bans.delete(dev);
     let id = crypto.randomBytes(6).toString('hex');
     let token = crypto.randomBytes(24).toString('hex');
 
@@ -147,22 +221,26 @@ function createServer(opts = {}) {
     }
     if (room.peers.size >= cfg.maxPeers) { sse(res, 'full', { max: cfg.maxPeers }); return res.end(); }
 
-    const peer = { id, token, name, state: { mic: true, cam: true, screen: false, hand: false }, res, roomName, bucket: cfg.burst, bt: Date.now() };
+    const peer = { id, token, name, dev, state: { mic: true, cam: true, screen: false, hand: false }, res, roomName, bucket: cfg.burst, bt: Date.now() };
     broadcast(room, 'join', { id, name, state: peer.state });
     sse(res, 'hello', {
       id, token, room: roomName,
       peers: [...room.peers.values()].map(p => ({ id: p.id, name: p.name, state: p.state })),
       history: room.history, iceServers: iceServers(cfg.env),
       game: room.game ? G.view(room.game, id) : null,
+      polls: [...room.polls.values()].filter(v => v.target !== id).map(v => pollView(room, v)),
     });
     room.peers.set(id, peer);
     tokens.set(token, peer);
     peer.ping = setInterval(() => sse(res, 'ping', Date.now()), cfg.pingMs);
     peer.ping.unref?.();
+    evalPolls(room);   // новый участник тоже голосует — обновляем счёт
 
     req.on('close', () => {
       if (peer.replaced) return;
+      if (peer.kicked) { maybeDropRoom(room); return; }
       detach(room, peer);
+      evalPolls(room);
       const timer = setTimeout(() => { departed.delete(id); gameLeave(room, id); }, cfg.graceMs);
       timer.unref?.();
       departed.set(id, { token, roomName, timer });
@@ -209,6 +287,10 @@ function createServer(opts = {}) {
           host: +c.host || 0, srflx: +c.srflx || 0, relay: +c.relay || 0, attempts: +d.attempts || 0, ua };
         net.recent.push(ev); if (net.recent.length > 60) net.recent.shift();
         if (d.state !== 'connected') console.log('[net]', JSON.stringify(ev));
+        break;
+      }
+      case 'kick': {
+        handleVote(p, room, msg.data || {});
         break;
       }
       case 'game': {

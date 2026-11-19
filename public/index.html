@@ -280,6 +280,31 @@ details.lc summary{cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 #unmute{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:70;border:0;border-radius:12px;padding:12px 18px;background:#e0892a;color:#fff;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer;animation:pop .4s}
 audio.rpeer{display:none}
+.tile .vol{position:absolute;top:8px;right:46px;opacity:0;background:rgba(0,0,0,.55);border:0;border-radius:8px;padding:6px;cursor:pointer;transition:opacity .15s;line-height:0}
+.tile:hover .vol{opacity:1}
+@media(hover:none){.tile .vol{opacity:.85}}
+.tile .vol svg{width:18px;height:18px}
+.tile.hand .vol{right:84px}
+.tile .vlow{position:absolute;top:10px;left:10px;font-size:12px;background:rgba(0,0,0,.6);padding:3px 7px;border-radius:6px;display:none}
+.tile.quiet .vlow{display:block}
+.tile .st:not(:empty)~.vlow{display:none}
+#peerMenu{min-width:270px;max-width:min(320px,92vw)}
+#peerMenu .sl{display:flex;flex-direction:column;gap:4px;padding:6px 8px;background:var(--panel2);border-radius:10px}
+#peerMenu .sl div{display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
+#peerMenu .sl input{width:100%;accent-color:var(--acc)}
+#peerMenu .sl.dim{opacity:.55}
+#peerMenu .opt.kick{color:#ff8a8a}
+#votes{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(420px,94vw)}
+.vote{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 14px 36px rgba(0,0,0,.55);animation:pop .3s}
+.vote p{margin:0 0 8px;font-size:14px}
+.vote small{color:var(--mute)}
+.vote .vb{display:flex;gap:8px}
+.vote .vb button{flex:1;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:8px;cursor:pointer;font-weight:600}
+.vote .vb button.y.act{background:var(--red);border-color:var(--red);color:#fff}
+.vote .vb button.n.act{background:var(--acc);border-color:var(--acc);color:#fff}
+.vote .tm{height:3px;background:var(--bg);border-radius:2px;margin-top:10px;overflow:hidden}
+.vote .tm i{display:block;height:100%;background:var(--mute);transform-origin:left}
+@media(max-width:700px),(max-height:500px){#votes{top:auto;bottom:calc(var(--fh,70px) + 10px)}}
 .netrow{display:flex;justify-content:space-between;gap:10px;background:var(--bg);border-radius:10px;padding:9px 11px;margin-bottom:6px;font-size:14px}
 .netrow small{color:var(--mute)}
 .netrow .ok{color:var(--green)}.netrow .warn{color:#e0b52a}.netrow .bad{color:#ff8a8a}
@@ -416,6 +441,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 </dialog>
 <button id="unmute" class="hidden">🔊 Нажмите, чтобы включить звук собеседников</button>
 <div id="toast"></div>
+<div id="votes"></div>
+<div id="peerMenu" class="sheet hidden"></div>
 
 <script>
 'use strict';
@@ -425,6 +452,7 @@ const IC = {
   micOff:'<svg viewBox="0 0 24 24"><path d="M3 3l18 18M9 9v1a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7M5 10a7 7 0 0 0 11.2 5.6M19 10a7 7 0 0 1-.6 2.8M12 17v5"/></svg>',
   cam:'<svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
   camOff:'<svg viewBox="0 0 24 24"><path d="M3 3l18 18M16 10l6-3v10l-4-2M14 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2M10 6h4a2 2 0 0 1 2 2v4"/></svg>',
+  vol:'<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
   screen:'<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M9 10l3-3 3 3M12 7v6"/></svg>',
   chat:'<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L3 21l2-6.2A8 8 0 1 1 21 12z"/></svg>',
   gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -557,12 +585,20 @@ function buildMix() {
   for (const t of [local.audio, sa]) if (t) { const n = ac().createMediaStreamSource(new MediaStream([t])); n.connect(dest); nodes.push(n); }
   mix = { track: dest.stream.getAudioTracks()[0], nodes };
 }
+// Аудио-дорожки соединения: [0] — голос, [1] — звук демонстрации (отдельно, чтобы его громкость регулировалась отдельно).
+// Порядок дорожек одинаковый у обеих сторон (задаёт тот, кто создаёт offer).
+const audioTs = pc => pc.getTransceivers().filter(t => t.receiver.track.kind === 'audio');
 function attachLocal(p) {
+  const auds = audioTs(p.pc), split = auds.length > 1;
   for (const t of p.pc.getTransceivers()) {
     if (t.stopped || t.currentDirection === 'stopped') continue;
     const kind = t.receiver.track.kind;
     if (t.direction !== 'sendrecv') t.direction = 'sendrecv';
-    t.sender.replaceTrack(kind === 'video' ? outVideo() || null : outAudio() || null).catch(() => {});
+    let track;
+    if (kind === 'video') track = outVideo();
+    else if (!split) track = outAudio();          // старый клиент с одной дорожкой — звук экрана подмешан в голос
+    else track = auds.indexOf(t) === 0 ? local.audio : screen?.getAudioTracks()[0];
+    t.sender.replaceTrack(track || null).catch(() => {});
   }
 }
 function refreshOutgoing() {
@@ -631,6 +667,10 @@ function makeTile(id, name) {
   el.dataset.id = id;
   el.innerHTML = `<video autoplay playsinline></video><div class="avatar"><b></b></div><div class="st"></div><div class="hand">✋</div>
     <div class="label"><span class="mo">${IC.micOff}</span><span class="nm"></span></div><button class="fs" title="На весь экран">${IC.full}</button><div class="rz" title="Потяните, чтобы изменить размер"></div>`;
+  if (id !== 'self') {
+    el.insertAdjacentHTML('beforeend', `<button class="vol" title="Громкость и исключение">${IC.vol}</button><div class="vlow">🔉</div>`);
+    el.querySelector('.vol').onclick = e => { e.stopPropagation(); openPeerMenu(id, e.currentTarget); };
+  }
   const t = { el, video: el.querySelector('video') };
   setTileName(t, name);
   el.querySelector('.fs').onclick = e => { e.stopPropagation(); goFull(el); };
@@ -907,7 +947,7 @@ function renderLayoutMenu() {
     ${hasCustom ? '<button class="opt" data-preset="reset"><span>↺ Сбросить своё расположение</span></button>' : ''}`;
   if (ctx === 'call' && isNarrow()) m.innerHTML = `<h4>Звонок</h4><div class="hint">На телефоне камеры раскладываются автоматически. Откройте игру — появятся раскладки «камеры сверху и снизу» и «игра крупно».</div>`;
 }
-function closeSheets() { $('#layoutMenu').classList.add('hidden'); $('#moreSheet').classList.add('hidden'); }
+function closeSheets() { $('#layoutMenu').classList.add('hidden'); $('#moreSheet').classList.add('hidden'); $('#peerMenu').classList.add('hidden'); peerMenuId = null; }
 $('#bLayout').onclick = e => { e.stopPropagation(); const m = $('#layoutMenu'); const open = m.classList.contains('hidden'); closeSheets(); m.classList.toggle('hidden', !open); renderLayoutMenu(); };
 $('#layoutMenu').addEventListener('click', e => {
   e.stopPropagation();
@@ -917,10 +957,76 @@ $('#layoutMenu').addEventListener('click', e => {
   else LY[ctx] = id;
   saveLayout(); layout(); renderLayoutMenu();
 });
-document.addEventListener('click', e => { if (!e.target.closest('.sheet') && !e.target.closest('#bLayout,#bMore')) closeSheets(); });
+document.addEventListener('click', e => { if (!e.target.closest('.sheet') && !e.target.closest('#bLayout,#bMore,.tile .vol')) closeSheets(); });
 if (window.ResizeObserver) new ResizeObserver(() => { if ($('#grid').classList.contains('free') && !drag) layout(); }).observe($('#grid'));
 addEventListener('resize', layout);
 function applySink(v) { if (S.spk && v.setSinkId) v.setSinkId(S.spk).catch(() => {}); }
+
+// ---------- громкость участников и голосование за исключение ----------
+const DEV = (() => {   // постоянный id браузера: по нему сервер не пускает обратно исключённого
+  try { let d = localStorage.getItem('sozvon-dev'); if (!d) { d = [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('sozvon-dev', d); } return d; }
+  catch { return [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join(''); }
+})();
+const VOL = (() => { try { return JSON.parse(localStorage.getItem('sozvon-vol') || '{}'); } catch { return {}; } })();   // по имени: { голос, экран } в %
+const volOf = name => Object.assign({ v: 100, s: 100 }, VOL[name]);
+function applyVolume(p) {
+  const { v, s } = volOf(p.name);
+  p.audio.volume = v / 100; p.audio.muted = v === 0;
+  p.saudio.volume = s / 100; p.saudio.muted = s === 0;
+  p.tile.el.classList.toggle('quiet', v < 100 || s < 100);
+}
+let peerMenuId = null;
+function openPeerMenu(id, btn) {
+  const p = peers.get(id); if (!p) return;
+  const m = $('#peerMenu');
+  if (peerMenuId === id) return closeSheets();
+  closeSheets(); peerMenuId = id;
+  const vol = volOf(p.name), ios = /iPhone|iPad/.test(navigator.userAgent);
+  m.innerHTML = `<h4>${esc(p.name)}</h4>
+    <label class="sl"><div><span>🎙 Голос</span><b data-o="v">${vol.v}%</b></div><input type="range" min="0" max="100" step="5" value="${vol.v}" data-k="v"></label>
+    <label class="sl ${p.state.screen ? '' : 'dim'}"><div><span>🖥 Звук демонстрации</span><b data-o="s">${vol.s}%</b></div><input type="range" min="0" max="100" step="5" value="${vol.s}" data-k="s"></label>
+    ${ios ? '<div class="hint">На iPhone браузер позволяет только выключить звук (0%) — громкость меняется кнопками телефона.</div>' : ''}
+    <button class="opt" data-a="reset"><span>↺ Вернуть 100%</span></button>
+    <button class="opt kick" data-a="kick"><span>🚫 Предложить исключить</span></button>`;
+  m.classList.remove('hidden');
+  const r = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
+  m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 6)) + 'px';
+}
+$('#peerMenu').addEventListener('input', e => {
+  const k = e.target.dataset.k, p = peers.get(peerMenuId); if (!k || !p) return;
+  VOL[p.name] = Object.assign(volOf(p.name), { [k]: +e.target.value });
+  try { localStorage.setItem('sozvon-vol', JSON.stringify(VOL)); } catch {}
+  $(`#peerMenu [data-o="${k}"]`).textContent = e.target.value + '%';
+  applyVolume(p);
+});
+$('#peerMenu').addEventListener('click', e => {
+  e.stopPropagation();
+  const a = e.target.closest('[data-a]')?.dataset.a, p = peers.get(peerMenuId); if (!a || !p) return;
+  if (a === 'reset') { delete VOL[p.name]; try { localStorage.setItem('sozvon-vol', JSON.stringify(VOL)); } catch {} applyVolume(p); closeSheets(); openPeerMenu(p.id, p.tile.el.querySelector('.vol')); return; }
+  if (a === 'kick') {
+    closeSheets();
+    if (!confirm(`Начать голосование за исключение «${p.name}»? Исключённый не сможет вернуться 10 минут.`)) return;
+    send('kick', { op: 'start', target: p.id });
+  }
+});
+function renderVote(d) {
+  const box = $('#votes');
+  let el = box.querySelector(`.vote[data-t="${d.target}"]`);
+  if (!el) {
+    el = document.createElement('div'); el.className = 'vote'; el.dataset.t = d.target;
+    el.innerHTML = `<p></p><div class="vb"><button class="y">Исключить</button><button class="n">Оставить</button></div><div class="tm"><i></i></div>`;
+    el.querySelector('.y').onclick = () => send('kick', { op: 'yes', target: d.target });
+    el.querySelector('.n').onclick = () => send('kick', { op: 'no', target: d.target });
+    box.append(el);
+    const i = el.querySelector('.tm i'), left = Math.max(0, d.deadline - Date.now());
+    i.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: left, fill: 'forwards' });
+    if (!d.yesIds.includes(me)) toast(`${d.by} предлагает исключить ${d.name}`);
+  }
+  el.querySelector('p').innerHTML = `Исключить <b>${esc(d.name)}</b>? <small>Предложил(а) ${esc(d.by)}</small><br><small>За: ${d.yes} из ${d.need} нужных · Против: ${d.no}</small>`;
+  el.querySelector('.y').classList.toggle('act', d.yesIds.includes(me));
+  el.querySelector('.n').classList.toggle('act', d.noIds.includes(me));
+}
 
 // ---------- WebRTC (perfect negotiation, mesh) ----------
 function createPeer(id, name, state, initiator) {
@@ -931,10 +1037,12 @@ function createPeer(id, name, state, initiator) {
   tile.video.muted = true;
   const audio = document.createElement('audio');
   audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.className = 'rpeer';
-  tile.el.append(audio);
-  const p = { id, name, tile, audio, state: state || {}, polite: me > id, attempts: 0, cands: { host: 0, srflx: 0, relay: 0 }, q: Promise.resolve() };
+  const saudio = document.createElement('audio');   // звук демонстрации экрана
+  saudio.autoplay = true; saudio.setAttribute('playsinline', ''); saudio.className = 'rpeer';
+  tile.el.append(audio, saudio);
+  const p = { id, name, tile, audio, saudio, state: state || {}, polite: me > id, attempts: 0, cands: { host: 0, srflx: 0, relay: 0 }, q: Promise.resolve() };
   peers.set(id, p);
-  applySink(audio);
+  applySink(audio); applySink(saudio); applyVolume(p);
   wirePc(p, initiator);
   applyState(p);
   return p;
@@ -951,7 +1059,10 @@ function wirePc(p, initiator) {
   setStatus(p, 'Подключение…');
   pc.ontrack = e => {
     if (pc !== p.pc) return;
-    if (e.track.kind === 'audio') {
+    if (e.track.kind === 'audio' && audioTs(pc).indexOf(e.transceiver) > 0) {
+      p.saudio.srcObject = new MediaStream([e.track]);
+      playAudio(p.saudio);
+    } else if (e.track.kind === 'audio') {
       p.audio.srcObject = new MediaStream([e.track]);
       playAudio(p.audio);
       addMeter(p.id, e.track, l => tile.el.classList.toggle('speaking', l > .1 && p.state.mic !== false));
@@ -992,6 +1103,7 @@ function wirePc(p, initiator) {
   if (initiator) {
     pc.addTransceiver('audio', { direction: 'sendrecv' });
     pc.addTransceiver('video', { direction: 'sendrecv' });
+    pc.addTransceiver('audio', { direction: 'sendrecv' });   // звук демонстрации экрана
     attachLocal(p);
   }
 }
@@ -1058,7 +1170,7 @@ function playAudio(el) {
 function unlockAudio() {
   ac().resume?.();
   let ok = true;
-  peers.forEach(p => { if (p.audio.srcObject) p.audio.play().catch(() => { ok = false; }); });
+  peers.forEach(p => { for (const a of [p.audio, p.saudio]) if (a.srcObject) a.play().catch(() => { ok = false; }); });
   setTimeout(() => { if (ok) $('#unmute').classList.add('hidden'); }, 200);
 }
 function onSignal({ from, data }) {
@@ -1096,7 +1208,8 @@ function applyState(p) {
 function removePeer(id) {
   const p = peers.get(id); if (!p) return;
   clearTimeout(p.connTimer); clearTimeout(p.discTimer);
-  try { p.audio.srcObject = null; } catch {}
+  try { p.audio.srcObject = null; p.saudio.srcObject = null; } catch {}
+  if (peerMenuId === id) closeSheets();
   p.pc.close(); removeMeter(id);
   if (pinned === p.tile.el) pin(null);
   p.tile.el.remove(); peers.delete(id); layout(); tuneSenders();
@@ -1152,7 +1265,7 @@ function tuneSenders() {
 function connect() {
   const name = S.name || 'Гость';
   const rq = resume ? `&rid=${encodeURIComponent(resume.rid)}&rkey=${encodeURIComponent(resume.rkey)}` : '';
-  es = new EventSource(`/events?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(name)}${rq}`);
+  es = new EventSource(`/events?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(name)}&dev=${DEV}${rq}`);
   lastSeen = Date.now();
   const on = (ev, fn) => es.addEventListener(ev, e => { lastSeen = Date.now(); try { fn(e.data ? JSON.parse(e.data) : null); } catch (err) { console.error(ev, err); } });
   on('hello', d => {
@@ -1160,6 +1273,7 @@ function connect() {
     $('#msgs').innerHTML = ''; d.history.forEach(m => addMsg(m, true));
     d.peers.forEach(p => createPeer(p.id, p.name, p.state, true));
     setGame(d.game, true);
+    $('#votes').innerHTML = ''; (d.polls || []).forEach(renderVote);
     sendState();
   });
   on('ping', () => {});
@@ -1173,6 +1287,20 @@ function connect() {
     if (d.state.screen && !p.state.screen) { toast(`${p.name} показывает экран`); pin(p.tile.el); }
     if (!d.state.screen && p.state.screen && pinned === p.tile.el) pin(null);
     p.state = d.state; applyState(p);
+  });
+  on('vote', renderVote);
+  on('vote-end', d => {
+    document.querySelector(`.vote[data-t="${d.target}"]`)?.remove();
+    if (d.result === 'kicked') sysMsg(`${d.name} исключён(-а) голосованием`);
+    else toast(`Голосование за исключение ${d.name} не набрало голосов`);
+  });
+  on('vote-error', d => toast(d.message));
+  on('kicked', d => {
+    leaving = true; inCall = false; es.close();
+    peers.forEach(p => p.pc.close());
+    [local.audio, local.video].forEach(t => t?.stop()); screen?.getTracks().forEach(t => t.stop());
+    alert(d.banned ? `Вас исключили из этой комнаты. Вернуться можно примерно через ${d.minutes} мин.` : `Участники проголосовали и исключили вас из комнаты. Вернуться можно через ${d.minutes} мин.`);
+    location.href = location.pathname;
   });
   on('game', d => setGame(d));
   on('game-error', d => toast('🎮 ' + d.message));

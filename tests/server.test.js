@@ -32,7 +32,7 @@ function connect(port, room, name, extra = '') {
           const e = { ev, data: JSON.parse(data), t: performance.now(), used: false };
           c.events.push(e);
           if (ev === 'hello') { c.id = e.data.id; c.token = e.data.token; resolve(c); }
-          if (ev === 'full' || ev === 'busy') resolve(c);
+          if (ev === 'full' || ev === 'busy' || (ev === 'kicked' && e.data.banned)) resolve(c);
           for (const w of [...c.waiters]) if (!e.used && w.pred(e)) { e.used = true; c.waiters.splice(c.waiters.indexOf(w), 1); w.resolve(e); }
         }
       });
@@ -374,5 +374,49 @@ test('TURN: временные учётки по секрету, TLS на 443', 
     assert.ok(!JSON.stringify(a.events[0].data).includes('sekret'), 'сам секрет клиенту не уходит');
     const h = await (await fetch(`http://127.0.0.1:${s.port}/health`)).json();
     assert.equal(h.turn, true);
+  } finally { await s.close(); }
+});
+
+test('Голосование: исключение большинством и бан на повторный вход', async () => {
+  const s = await startServer({ voteCooldownMs: 0 });
+  try {
+    const a = await connect(s.port, 'kick', 'A', '&dev=aaaa');
+    const b = await connect(s.port, 'kick', 'B', '&dev=bbbb');
+    const c = await connect(s.port, 'kick', 'C', '&dev=cccc');
+    const t = await connect(s.port, 'kick', 'Тролль', '&dev=dead');
+    // 3 голосующих → нужно 2 голоса «за»
+    await send(s.port, a, [{ type: 'kick', data: { op: 'start', target: t.id } }]);
+    const v = await wait(b, 'vote', d => d.target === t.id);
+    assert.equal(v.data.need, 2); assert.equal(v.data.yes, 1); assert.equal(v.data.by, 'A');
+    assert.ok(!t.events.some(e => e.ev === 'vote'), 'тот, кого исключают, голосование не видит');
+    assert.equal(await send(s.port, t, [{ type: 'kick', data: { op: 'no', target: t.id } }]), 204);
+    await send(s.port, b, [{ type: 'kick', data: { op: 'yes', target: t.id } }]);
+    await wait(t, 'kicked');
+    const end = await wait(c, 'vote-end');
+    assert.equal(end.data.result, 'kicked');
+    await wait(c, 'leave', d => d.id === t.id);
+    assert.equal(await send(s.port, t, [{ type: 'chat', data: { text: 'я тут' } }]), 403, 'токен исключённого больше не работает');
+    const again = await connect(s.port, 'kick', 'Тролль2', '&dev=dead').catch(() => null);
+    await new Promise(r => setTimeout(r, 100));
+    const ev = (again || { events: [] }).events.length ? again.events : [];
+    assert.ok(ev.some(e => e.ev === 'kicked' && e.data.banned), 'вернуться нельзя');
+  } finally { await s.close(); }
+});
+
+test('Голосование: большинство против — не исключают', async () => {
+  const s = await startServer({ voteCooldownMs: 0 });
+  try {
+    const a = await connect(s.port, 'kick2', 'A', '&dev=a1');
+    const b = await connect(s.port, 'kick2', 'B', '&dev=b1');
+    const c = await connect(s.port, 'kick2', 'C', '&dev=c1');
+    await send(s.port, a, [{ type: 'kick', data: { op: 'start', target: c.id } }]);
+    await wait(b, 'vote');
+    await send(s.port, b, [{ type: 'kick', data: { op: 'no', target: c.id } }]);
+    const end = await wait(a, 'vote-end');
+    assert.equal(end.data.result, 'failed');
+    assert.ok(!c.events.some(e => e.ev === 'kicked'));
+    await send(s.port, a, [{ type: 'kick', data: { op: 'start', target: a.id } }]);
+    await new Promise(r => setTimeout(r, 100));
+    assert.ok(!b.events.some(e => e.ev === 'vote' && !e.used), 'себя выгнать нельзя');
   } finally { await s.close(); }
 });
